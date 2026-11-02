@@ -1,348 +1,242 @@
+/* RACE TO RICHES – game logic. Vanilla JS, no backend. State lives in localStorage. */
 (() => {
-  "use strict";
-  const $ = (id) => document.getElementById(id);
-  const STORAGE_KEY = "raceToRiches_v1";
-  const COLOURS = ["blue", "yellow", "green", "red"];
-  const DEFAULTS = {
-    teams: ["TEAM 1", "TEAM 2", "TEAM 3", "TEAM 4"],
-    previewSeconds: 10, answerSeconds: 20, volume: 0.65, muted: false
-  };
-  const clone = (v) => JSON.parse(JSON.stringify(v));
-  const bank = Array.isArray(window.questions) ? window.questions : [];
-  const safeQuestions = bank.length ? bank : [{
-    question: "Add your questions in questions.js.", options: {blue:"A",yellow:"B",green:"C",red:"D"}, correctAnswer:"blue"
-  }];
-  const freshHistory = () => safeQuestions.map(() => [0,0,0,0]);
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch {}
-  let settings = {...DEFAULTS, ...(saved.settings || {})};
-  let teamNames = Array.isArray(saved.teamNames) && saved.teamNames.length === 4 ? saved.teamNames : [...settings.teams];
-  let totals = Array.isArray(saved.totals) && saved.totals.length === 4 ? saved.totals : [0,0,0,0];
-  let history = Array.isArray(saved.history) && saved.history.length === safeQuestions.length ? saved.history : freshHistory();
-  let questionIndex = Math.min(Math.max(0, Number(saved.questionIndex) || 0), safeQuestions.length - 1);
-  let phase = "home";
-  let timerMode = "preview";
-  let remainingMs = settings.previewSeconds * 1000;
-  let deadline = 0, ticker = null, paused = false;
-  let currentPoints = [0,0,0,0];
-  let reviewMode = false;
-  let sequences = Array.from({length:4}, () => ({10:0,30:0,60:0,100:0}));
-  let undoStack = [];
-  let audioUrl = null, backgroundUrl = null;
-  let podium = {third:null, second:null, first:null};
-  let podiumStep = "third";
-  const audio = $("answer-audio");
+'use strict';
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const KEY = 'rtr_state_v1', BGKEY = 'rtr_bg', MKEY = 'rtr_music';
+const N = questions.length, COLORS = ['blue', 'yellow', 'green', 'red'], BTNS = [10, 30, 60, 100];
 
-  function persist() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({settings,teamNames,totals,history,questionIndex}));
+/* ---------- State ---------- */
+const fresh = () => ({
+  names: ['TEAM 1', 'TEAM 2', 'TEAM 3', 'TEAM 4'], pre: 10, ans: 20, vol: 0.6, mute: false, fs: false,
+  q: 0, hist: Array.from({ length: N }, () => [0, 0, 0, 0]),
+  seqs: Array.from({ length: N }, () => [{}, {}, {}, {}]), adj: [0, 0, 0, 0], podium: [], started: false
+});
+let S = fresh();
+try { const r = JSON.parse(localStorage.getItem(KEY)); if (r && r.hist && r.hist.length === N) S = Object.assign(fresh(), r); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const total = t => S.hist.reduce((a, h) => a + h[t], 0) + S.adj[t];
+let phase = 'preview', tm = null, timerId = null, undoStack = [], prevScreen = 'home';
+
+/* ---------- Helpers ---------- */
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.id); toast.id = setTimeout(() => t.classList.remove('show'), 1800); }
+function show(id) {
+  $$('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+  document.body.classList.toggle('ingame', id === 'game');
+  $('#mall').classList.toggle('dim', id !== 'home');
+  $('#mall').classList.toggle('art', id === 'home' && !!artUrl);
+  if (id !== 'podium') stopFx();
+  prevScreen = id === 'score' ? prevScreen : id;
+}
+function animNum(el, to) {
+  const from = el._v === undefined ? to : el._v; el._v = to; cancelAnimationFrame(el._r);
+  const t0 = performance.now();
+  (function step(now) { const p = Math.min(1, (now - t0) / 700); el.textContent = Math.round(from + (to - from) * p); if (p < 1) el._r = requestAnimationFrame(step); })(t0);
+}
+
+/* ---------- Background art & decorations ---------- */
+let artUrl = null;
+function setArt(url) { artUrl = url; $('#mall').style.setProperty('--art', url ? `url("${url}")` : 'none'); $('#mall').classList.toggle('art', !!url && $('#home').classList.contains('active')); }
+(function loadArt() {
+  const up = localStorage.getItem(BGKEY); if (up) return setArt(up);
+  const im = new Image(); im.onload = () => setArt('assets/race-to-riches-bg.png'); im.src = 'assets/race-to-riches-bg.png';
+})();
+(function decor() {
+  const c = $('#coins'); let h = '';
+  for (let i = 0; i < 9; i++) { const s = 34 + Math.random() * 46;
+    h += `<div class="coin" style="width:${s}px;height:${s}px;left:${5 + Math.random() * 90}%;top:${8 + Math.random() * 80}%;animation-duration:${1.5 + Math.random() * 3}s,${5 + Math.random() * 5}s;opacity:${.55 + Math.random() * .4}">$</div>`; }
+  for (let i = 0; i < 6; i++) h += `<div class="gem" style="left:${Math.random() * 95}%;top:${Math.random() * 85}%;font-size:${22 + Math.random() * 26}px;animation-delay:${-Math.random() * 6}s">${['💎', '👑', '✨', '💍', '⌚'][i % 5]}</div>`;
+  c.innerHTML = h;
+})();
+
+/* ---------- Music ---------- */
+const music = new Audio('assets/answering-music.mp3'); music.loop = true; music.preload = 'auto';
+try { const m = localStorage.getItem(MKEY); if (m) music.src = m; } catch (e) {}
+const applyVol = () => { music.volume = S.vol; music.muted = S.mute; };
+function playMusic(restart) { applyVol(); if (restart) music.currentTime = 0; const p = music.play(); if (p) p.catch(() => toast('Music blocked or missing – click anywhere & resume')); }
+function stopMusic() { music.pause(); try { music.currentTime = 0; } catch (e) {} }
+function unlockAudio() { // called from a click so browsers allow later playback
+  music.muted = true; const p = music.play(); const done = () => { music.pause(); music.currentTime = 0; applyVol(); };
+  p ? p.then(done).catch(done) : done();
+}
+
+/* ---------- Timer (elapsed-time based, single instance) ---------- */
+function stopTimer() { clearInterval(timerId); timerId = null; tm = null; }
+function startPhase(name, secs) {
+  stopTimer(); phase = name; tm = { name, endAt: performance.now() + secs * 1000, rem: secs * 1000, paused: false };
+  $('#game').className = 'screen active p-' + name; $('#bPause').textContent = 'PAUSE TIMER';
+  setTimerText(secs); if (name === 'answer') playMusic(true); else stopMusic();
+  timerId = setInterval(tick, 100); updateBar();
+}
+function setTimerText(sec) { const t = $('#timer'); t.textContent = sec; t.classList.toggle('warn', phase === 'answer' && sec <= 5 && sec > 0); t.classList.toggle('zero', sec === 0); }
+function tick() {
+  if (!tm || tm.paused) return;
+  const rem = Math.max(0, tm.endAt - performance.now()); setTimerText(Math.ceil(rem / 1000));
+  if (rem > 0) return;
+  const n = tm.name; stopTimer();             // stop first => no double transitions
+  if (n === 'preview') startPhase('answer', S.ans); else reveal();
+}
+function togglePause() {
+  if (!tm) return;
+  if (!tm.paused) { tm.rem = Math.max(0, tm.endAt - performance.now()); tm.paused = true; music.pause(); $('#bPause').textContent = 'RESUME TIMER'; }
+  else { tm.endAt = performance.now() + tm.rem; tm.paused = false; if (tm.name === 'answer') playMusic(false); $('#bPause').textContent = 'PAUSE TIMER'; }
+}
+
+/* ---------- Question flow ---------- */
+function beginQuestion(i) {
+  stopTimer(); stopMusic(); S.q = i; undoStack = []; save(); show('game');
+  const q = questions[i];
+  $('#qnum').textContent = `QUESTION ${i + 1} / ${N}`; $('#qbox').textContent = q.question;
+  $$('.ans').forEach(a => { a.classList.remove('win', 'dim'); a.querySelector('.atext').textContent = q.options[a.dataset.c]; });
+  $('#scorepanel').innerHTML = ''; shown = []; startPhase('preview', S.pre);
+}
+function reveal() {
+  stopTimer(); stopMusic(); phase = 'reveal'; $('#game').className = 'screen active p-reveal';
+  const c = questions[S.q].correctAnswer;
+  $$('.ans').forEach(a => { a.classList.toggle('win', a.dataset.c === c); a.classList.toggle('dim', a.dataset.c !== c); });
+  $('#banner').textContent = `CORRECT ANSWER! ${c.toUpperCase()} – ${questions[S.q].options[c]}`;
+  buildScore(); updateBar();
+}
+let shown = [];
+function buildScore() {
+  $('#scorepanel').innerHTML = S.names.map((n, t) => `<div class="team" id="team${t}"><div class="tname">${esc(n)}</div>
+    <div class="tpts">This question<br><b id="cur${t}">0</b></div><div class="tpts">Total<br><b id="tot${t}">0</b></div>
+    <div class="sbtns">${BTNS.map(b => `<button class="sbtn" data-t="${t}" data-b="${b}">+${b}<small id="nx${t}_${b}"></small></button>`).join('')}
+    <button class="sbtn zero" data-t="${t}" data-b="0">0<small>reset</small></button></div></div>`).join('');
+  $$('.sbtn').forEach(b => b.onclick = () => +b.dataset.b ? award(+b.dataset.t, +b.dataset.b) : zero(+b.dataset.t));
+  refreshScore(true);
+}
+function refreshScore(init) {
+  for (let t = 0; t < 4; t++) {
+    animNum($('#cur' + t), S.hist[S.q][t]); animNum($('#tot' + t), total(t));
+    BTNS.forEach(b => { const n = S.seqs[S.q][t][b] || 0; $(`#nx${t}_${b}`).textContent = n ? `next +${b * 2 ** n} (×${n})` : ''; });
   }
-  function showToast(message) {
-    const el = $("toast"); el.textContent = message; el.classList.add("show");
-    clearTimeout(showToast.timeout); showToast.timeout = setTimeout(() => el.classList.remove("show"), 2300);
-  }
-  function showScreen(name) {
-    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-    $(name + "-screen").classList.add("active");
-    phase = name;
-    $("round-indicator").textContent = name === "game" ? `QUESTION ${questionIndex+1} / ${safeQuestions.length}` : "ENGLISH CAMP";
-  }
-  function stopTimer() { if (ticker) clearInterval(ticker); ticker = null; }
-  function stopAudio() { audio.pause(); try { audio.currentTime = 0; } catch {} }
-  function pauseAudio() { audio.pause(); }
-  function playAudio() {
-    if (settings.muted || !audio.src) return;
-    audio.volume = settings.volume;
-    const p = audio.play(); if (p && p.catch) p.catch(() => showToast("Click START GAME once more to enable audio."));
-  }
-  function setTimer(seconds, mode) {
-    stopTimer(); timerMode = mode; remainingMs = seconds * 1000; deadline = Date.now() + remainingMs; paused = false;
-    updateTimerDisplay();
-    ticker = setInterval(tick, 100);
-    if (mode === "answer") playAudio(); else stopAudio();
-    $("pause-button").disabled = false; $("resume-button").disabled = true;
-  }
-  function tick() {
-    if (paused) return;
-    remainingMs = Math.max(0, deadline - Date.now());
-    updateTimerDisplay();
-    if (remainingMs <= 0) {
-      stopTimer();
-      if (timerMode === "preview") beginAnswering();
-      else if (timerMode === "answer") revealAnswer();
-    }
-  }
-  function updateTimerDisplay() {
-    const seconds = Math.ceil(remainingMs / 1000);
-    if (timerMode === "preview") $("preview-timer").textContent = seconds;
-    else $("answer-timer").textContent = seconds;
-    $("answer-timer").classList.toggle("urgent", timerMode === "answer" && seconds <= 5);
-    $("preview-timer").classList.toggle("urgent", timerMode === "preview" && seconds <= 3);
-  }
-  function currentQuestion() { return safeQuestions[questionIndex]; }
-  function beginQuestion(index = questionIndex) {
-    stopTimer(); stopAudio(); questionIndex = Math.max(0, Math.min(index, safeQuestions.length - 1));
-    currentPoints = [0,0,0,0]; reviewMode = false; sequences = Array.from({length:4}, () => ({10:0,30:0,60:0,100:0})); undoStack = [];
-    const q = currentQuestion();
-    $("question-count").textContent = `QUESTION ${questionIndex+1} / ${safeQuestions.length}`;
-    $("preview-question").textContent = q.question;
-    $("answer-q-number").textContent = `Q${questionIndex+1}`;
-    $("answer-question").textContent = q.question;
-    COLOURS.forEach(c => { $("option-"+c).textContent = q.options[c]; $("reveal-"+c).textContent = q.options[c]; });
-    $("preview-panel").classList.remove("hidden"); $("answer-layout").classList.add("hidden"); $("reveal-layout").classList.add("hidden");
-    $("phase-label").textContent = "QUESTION PREVIEW";
-    renderScoring();
-    showScreen("game"); persist();
-    setTimer(settings.previewSeconds, "preview");
-  }
-  function beginAnswering() {
-    stopAudio(); $("preview-panel").classList.add("hidden"); $("answer-layout").classList.remove("hidden");
-    $("reveal-layout").classList.add("hidden"); $("phase-label").textContent = "CHOOSE YOUR ANSWER ZONE";
-    setTimer(settings.answerSeconds, "answer");
-  }
-  function revealAnswer() {
-    stopTimer(); stopAudio(); remainingMs = 0;
-    $("preview-panel").classList.add("hidden"); $("answer-layout").classList.add("hidden"); $("reveal-layout").classList.remove("hidden");
-    $("phase-label").textContent = "ANSWER REVEAL & SCORING";
-    const q = currentQuestion(); const correct = COLOURS.includes(q.correctAnswer) ? q.correctAnswer : "blue";
-    $("correct-answer-copy").textContent = `${correct.toUpperCase()} — ${q.options[correct]}`;
-    COLOURS.forEach(c => {
-      const tile = document.querySelector(`#reveal-layout [data-colour="${c}"]`);
-      tile.classList.toggle("correct", c === correct); tile.classList.toggle("dimmed", c !== correct);
-    });
-    renderScoring(); $("pause-button").disabled = true; $("resume-button").disabled = true;
-  }
-  function pauseTimer() {
-    if (!ticker || paused) return;
-    remainingMs = Math.max(0, deadline - Date.now()); paused = true; stopTimer(); pauseAudio(); updateTimerDisplay();
-    $("pause-button").disabled = true; $("resume-button").disabled = false; showToast("Timer paused.");
-  }
-  function resumeTimer() {
-    if (!paused) return;
-    paused = false; deadline = Date.now() + remainingMs; ticker = setInterval(tick,100);
-    if (timerMode === "answer") { audio.volume = settings.volume; if (!settings.muted) audio.play().catch(()=>{}); }
-    $("pause-button").disabled = false; $("resume-button").disabled = true;
-  }
-  function renderScoring() {
-    $("team-scoring").innerHTML = teamNames.map((name,i) => `
-      <article class="team-card">
-        <h3>${escapeHTML(name)}</h3>
-        <div class="team-points">${currentPoints[i].toLocaleString()}</div>
-        <div class="team-total">TOTAL ${totals[i].toLocaleString()}</div>
-        <div class="score-buttons">
-          <button data-score="${i}:0" title="Reset current question" ${reviewMode?"disabled":""}>0</button>
-          <button data-score="${i}:10" ${reviewMode?"disabled":""}>+10</button><button data-score="${i}:30" ${reviewMode?"disabled":""}>+30</button>
-          <button data-score="${i}:60" ${reviewMode?"disabled":""}>+60</button><button data-score="${i}:100" ${reviewMode?"disabled":""}>+100</button>
-        </div>
-      </article>`).join("");
-    $("team-scoring").querySelectorAll("[data-score]").forEach(btn => btn.addEventListener("click", () => award(...btn.dataset.score.split(":").map(Number))));
-  }
-  function award(team, base) {
-    if (phase !== "game" || $("reveal-layout").classList.contains("hidden") || reviewMode) return;
-    const before = {current:[...currentPoints], totals:[...totals], sequences:clone(sequences)};
-    if (base === 0) {
-      totals[team] = Math.max(0, totals[team] - currentPoints[team]);
-      currentPoints[team] = 0;
-      sequences[team] = {10:0,30:0,60:0,100:0};
-    } else {
-      const multiplier = 2 ** sequences[team][base];
-      const points = base * multiplier;
-      currentPoints[team] += points; totals[team] += points; sequences[team][base] += 1;
-      showToast(`${teamNames[team]} +${points.toLocaleString()} points!`);
-    }
-    undoStack.push(before); renderScoring(); persist();
-  }
-  function undo() {
-    const before = undoStack.pop(); if (!before) return showToast("Nothing to undo.");
-    currentPoints = before.current; totals = before.totals; sequences = before.sequences;
-    renderScoring(); persist(); showToast("Last scoring action undone.");
-  }
-  function commitQuestion() {
-    history[questionIndex] = [...currentPoints];
-    if (questionIndex >= safeQuestions.length - 1) {
-      persist(); stopTimer(); stopAudio(); startPodium(); return;
-    }
-    questionIndex++; persist(); beginQuestion(questionIndex);
-  }
-  function previousQuestion() {
-    if (questionIndex === 0) return showToast("You are already at Question 1.");
-    stopTimer(); stopAudio(); questionIndex--;
-    currentPoints = [...(history[questionIndex] || [0,0,0,0])];
-    reviewMode = true; sequences = Array.from({length:4}, () => ({10:0,30:0,60:0,100:0})); undoStack = [];
-    const q = currentQuestion();
-    $("question-count").textContent = `QUESTION ${questionIndex+1} / ${safeQuestions.length}`;
-    $("preview-question").textContent = q.question;
-    $("answer-q-number").textContent = `Q${questionIndex+1}`;
-    $("answer-question").textContent = q.question;
-    COLOURS.forEach(c => { $("option-"+c).textContent=q.options[c]; $("reveal-"+c).textContent=q.options[c]; });
-    $("preview-panel").classList.add("hidden"); $("answer-layout").classList.add("hidden"); $("reveal-layout").classList.remove("hidden");
-    $("phase-label").textContent = "REVIEW — PREVIOUS QUESTION";
-    const correct = COLOURS.includes(q.correctAnswer) ? q.correctAnswer : "blue";
-    $("correct-answer-copy").textContent = `${correct.toUpperCase()} — ${q.options[correct]}`;
-    COLOURS.forEach(c => {
-      const tile=document.querySelector(`#reveal-layout [data-colour="${c}"]`);
-      tile.classList.toggle("correct",c===correct); tile.classList.toggle("dimmed",c!==correct);
-    });
-    renderScoring(); showScreen("game"); $("pause-button").disabled=true; $("resume-button").disabled=true;
-  }
-  function restartCurrentQuestion() {
-    // Remove this question's already-awarded points before starting it again.
-    if (reviewMode) {
-      for (let i=0;i<4;i++) totals[i]=Math.max(0,totals[i]-(history[questionIndex]?.[i]||0));
-      history[questionIndex]=[0,0,0,0];
-    } else {
-      for (let i=0;i<4;i++) totals[i]=Math.max(0,totals[i]-currentPoints[i]);
-    }
-    currentPoints=[0,0,0,0]; reviewMode=false; persist(); beginQuestion(questionIndex);
-  }
-  function renderLeaderboard() {
-    const ranking = teamNames.map((name,i)=>({name,score:totals[i],i})).sort((a,b)=>b.score-a.score);
-    $("leaderboard").innerHTML = ranking.map((t,rank)=>`
-      <article class="leader-card ${rank===0?'rank-1':''}">
-        <div class="leader-rank">${["♛ 1ST","2ND","3RD","4TH"][rank]}</div>
-        <div class="leader-name">${escapeHTML(t.name)}</div><div class="leader-score">${t.score.toLocaleString()}</div>
-        <label>Adjust total score<input type="number" data-adjust="${t.i}" value="${t.score}"></label>
-      </article>`).join("");
-    $("leaderboard").querySelectorAll("[data-adjust]").forEach(input=>input.addEventListener("change",()=>{
-      const i=Number(input.dataset.adjust), value=Math.max(0,Number(input.value)||0);
-      const old=totals[i]; totals[i]=value;
-      const historySum=history.reduce((sum,row)=>sum+(Number(row[i])||0),0);
-      // Score adjustment is stored as an offset in totals; history remains a question-by-question record.
-      persist(); renderLeaderboard(); showToast(`${teamNames[i]} total adjusted (${old} → ${value}).`);
-    }));
-    const head = `<tr><th>TEAM</th>${safeQuestions.map((_,i)=>`<th>Q${i+1}</th>`).join("")}<th>TOTAL</th></tr>`;
-    $("history-table").querySelector("thead").innerHTML = head;
-    $("history-table").querySelector("tbody").innerHTML = teamNames.map((name,i)=>{
-      const cells=history.map(row=>`<td>${Number(row[i]||0).toLocaleString()}</td>`).join("");
-      return `<tr><td>${escapeHTML(name)}</td>${cells}<td><b>${totals[i].toLocaleString()}</b></td></tr>`;
-    }).join("");
-  }
-  function openScoreboard() {
-    if (phase === "game" && ticker && !paused) pauseTimer();
-    renderLeaderboard(); showScreen("scoreboard");
-  }
-  function returnGame() { showScreen("game"); if (paused) resumeTimer(); }
-  function buildSettings() {
-    $("team-name-fields").innerHTML = teamNames.map((n,i)=>`<label>Team ${i+1}<input id="team-name-${i}" maxlength="24" value="${escapeAttr(n)}"></label>`).join("");
-    $("preview-duration").value=settings.previewSeconds; $("answer-duration").value=settings.answerSeconds;
-    $("music-volume").value=Math.round(settings.volume*100); $("volume-value").textContent=Math.round(settings.volume*100)+"%";
-    $("music-muted").checked=settings.muted;
-    $("music-status").textContent=audio.src?"Custom answering track selected.":"No custom track selected.";
-  }
-  function saveSettings() {
-    teamNames=teamNames.map((_,i)=>($("team-name-"+i).value.trim()||`TEAM ${i+1}`).toUpperCase());
-    settings.previewSeconds=clamp(Number($("preview-duration").value)||10,3,60);
-    settings.answerSeconds=clamp(Number($("answer-duration").value)||20,5,120);
-    settings.volume=Number($("music-volume").value)/100; settings.muted=$("music-muted").checked;
-    audio.volume=settings.volume; persist(); buildSettings(); showToast("Settings saved.");
-  }
-  function startPodium() {
-    stopTimer(); stopAudio(); podium={third:null,second:null,first:null}; podiumStep="third";
-    ["third","second","first"].forEach(k=>{$("podium-"+k).textContent=({third:"3RD PLACE",second:"2ND PLACE",first:"1ST PLACE"})[k];});
-    $("champion-banner").classList.add("hidden"); showScreen("podium"); renderPodiumChoices();
-  }
-  function renderPodiumChoices() {
-    const labels={third:"third place",second:"second place",first:"first place"};
-    $("podium-instruction").textContent=podiumStep==="done"?"The podium is complete!":`Choose the team taking ${labels[podiumStep]}.`;
-    const used=Object.values(podium).filter(Boolean);
-    $("podium-choices").innerHTML=podiumStep==="done"?"":teamNames.map((name,i)=>used.includes(i)?"":`<button data-podium="${i}">${escapeHTML(name)}</button>`).join("");
-    $("podium-choices").querySelectorAll("[data-podium]").forEach(btn=>btn.addEventListener("click",()=>selectPodium(Number(btn.dataset.podium))));
-  }
-  function selectPodium(team) {
-    if (Object.values(podium).includes(team)) return;
-    podium[podiumStep]=team;
-    $("podium-"+podiumStep).textContent=teamNames[team];
-    $("podium-"+podiumStep).classList.add("landed");
-    if (podiumStep==="third") podiumStep="second";
-    else if (podiumStep==="second") podiumStep="first";
-    else {
-      podiumStep="done"; $("champion-name").textContent=teamNames[team];
-      $("champion-banner").classList.remove("hidden");
-      showToast("A new champion has been crowned!");
-    }
-    renderPodiumChoices();
-  }
-  function undoPodium() {
-    if (podiumStep === "done") {
-      podium.first = null; $("podium-first").textContent = "1ST PLACE";
-      $("champion-banner").classList.add("hidden"); podiumStep = "first";
-    } else if (podiumStep === "first" && podium.second !== null) {
-      podium.second = null; $("podium-second").textContent = "2ND PLACE"; podiumStep = "second";
-    } else if (podiumStep === "second" && podium.third !== null) {
-      podium.third = null; $("podium-third").textContent = "3RD PLACE"; podiumStep = "third";
-    } else return showToast("There is no podium selection to undo.");
-    renderPodiumChoices();
-  }
-  function restartGame() {
-    stopTimer(); stopAudio(); totals=[0,0,0,0]; history=freshHistory(); questionIndex=0;
-    currentPoints=[0,0,0,0]; persist(); beginQuestion(0);
-  }
-  function exportCSV() {
-    const rows=[["TEAM",...safeQuestions.map((_,i)=>`Q${i+1}`),"TOTAL"]];
-    teamNames.forEach((name,i)=>rows.push([name,...history.map(r=>r[i]||0),totals[i]]));
-    const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
-    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="race-to-riches-score-history.csv";a.click();URL.revokeObjectURL(a.href);
-  }
-  function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-  function escapeAttr(s){return escapeHTML(s);}
-  function clamp(n,min,max){return Math.max(min,Math.min(max,n));}
-  function handleAction(action) {
-    switch(action){
-      case "home": stopTimer();stopAudio();showScreen("home");break;
-      case "start": beginQuestion(0);break;
-      case "settings": buildSettings();showScreen("settings");break;
-      case "scoreboard": openScoreboard();break;
-      case "return-game": returnGame();break;
-      case "pause": pauseTimer();break;
-      case "resume": resumeTimer();break;
-      case "skip": revealAnswer();break;
-      case "restart-question": restartCurrentQuestion();break;
-      case "previous": previousQuestion();break;
-      case "undo": undo();break;
-      case "next": if(!$("reveal-layout").classList.contains("hidden")) commitQuestion();break;
-      case "save-settings": saveSettings();break;
-      case "preview-music": if(audio.src){audio.currentTime=0;audio.volume=settings.volume;audio.play().catch(()=>showToast("Your browser blocked audio preview."));}else showToast("Upload an MP3 first.");break;
-      case "stop-music": stopAudio();break;
-      case "clear-background": if(backgroundUrl)URL.revokeObjectURL(backgroundUrl);backgroundUrl=null;document.body.classList.remove("custom-background");document.body.style.backgroundImage="";showToast("Default night theme restored.");break;
-      case "export":exportCSV();break;
-      case "restart-game":restartGame();break;
-      case "undo-podium":undoPodium();break;
-      case "fullscreen":if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.();break;
-    }
-  }
-  document.addEventListener("click",e=>{const btn=e.target.closest("[data-action]");if(btn)handleAction(btn.dataset.action);});
-  $("music-volume").addEventListener("input",e=>{$("volume-value").textContent=e.target.value+"%";audio.volume=Number(e.target.value)/100;});
-  $("music-upload").addEventListener("change",e=>{
-    const file=e.target.files[0];if(!file)return;
-    if(audioUrl)URL.revokeObjectURL(audioUrl);audioUrl=URL.createObjectURL(file);audio.src=audioUrl;
-    $("music-status").textContent=`Selected: ${file.name}`;showToast("Answering music loaded.");
-  });
-  $("background-upload").addEventListener("change",e=>{
-    const file=e.target.files[0];if(!file)return;
-    if(backgroundUrl)URL.revokeObjectURL(backgroundUrl);backgroundUrl=URL.createObjectURL(file);
-    document.body.style.backgroundImage=`linear-gradient(rgba(4,8,15,.72),rgba(4,8,15,.82)),url("${backgroundUrl}")`;
-    document.body.classList.add("custom-background");showToast("Background updated.");
-  });
-  document.addEventListener("keydown",e=>{
-    if(e.key==="Escape" && document.fullscreenElement)document.exitFullscreen?.();
-    if(e.code==="Space" && phase==="game"){e.preventDefault();if(paused)resumeTimer();else pauseTimer();}
-  });
-  function makeDecorations(){
-    const coinLayer=$("coin-layer"),sparkles=$("sparkle-layer");
-    for(let i=0;i<17;i++){const c=document.createElement("span");c.className="coin";c.textContent=["◉","◈","✦"][i%3];c.style.left=(Math.random()*100)+"%";c.style.top=(Math.random()*100)+"%";c.style.setProperty("--duration",(5+Math.random()*8)+"s");c.style.animationDelay=(-Math.random()*8)+"s";coinLayer.append(c);}
-    for(let i=0;i<26;i++){const s=document.createElement("span");s.className="sparkle";s.textContent="✧";s.style.left=(Math.random()*100)+"%";s.style.top=(Math.random()*100)+"%";s.style.animationDelay=(Math.random()*3)+"s";sparkles.append(s);}
-  }
-  function loadOptionalAssets() {
-    fetch("assets/race-to-riches-bg.png", {method:"HEAD"}).then(r => {
-      if (r.ok && !backgroundUrl) {
-        document.body.style.backgroundImage='linear-gradient(rgba(4,8,15,.72),rgba(4,8,15,.82)),url("assets/race-to-riches-bg.png")';
-        document.body.classList.add("custom-background");
-      }
-    }).catch(()=>{});
-    fetch("assets/answering-music.mp3", {method:"HEAD"}).then(r => {
-      if (r.ok && !audioUrl) { audio.src="assets/answering-music.mp3"; $("music-status").textContent="Loaded assets/answering-music.mp3"; }
-    }).catch(()=>{});
-  }
-  makeDecorations(); buildSettings(); loadOptionalAssets(); persist();
-  // If the page is refreshed mid-game, resume safely at the saved question's preview.
-  showScreen("home");
+}
+function award(t, b) {
+  const seq = S.seqs[S.q][t], n = seq[b] || 0, pts = b * 2 ** n;
+  undoStack.push({ q: S.q, t, pts: S.hist[S.q][t], seq: { ...seq } });
+  S.hist[S.q][t] += pts; seq[b] = n + 1; save(); refreshScore();
+  const el = $('#team' + t); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); toast(`${S.names[t]}: +${pts}`);
+}
+function zero(t) {
+  undoStack.push({ q: S.q, t, pts: S.hist[S.q][t], seq: { ...S.seqs[S.q][t] } });
+  S.hist[S.q][t] = 0; S.seqs[S.q][t] = {}; save(); refreshScore(); toast(`${S.names[t]}: question points reset`);
+}
+function undo() {
+  const u = undoStack.pop(); if (!u || u.q !== S.q) return toast('Nothing to undo');
+  S.hist[u.q][u.t] = u.pts; S.seqs[u.q][u.t] = u.seq; save();
+  if (phase === 'reveal') refreshScore(); toast('Last action undone');
+}
+function next() {
+  if (phase !== 'reveal') return;
+  if (S.q >= N - 1) { openPodium(); return; }
+  beginQuestion(S.q + 1);
+}
+function prev() { if (S.q > 0) { beginQuestion(S.q - 1); toast('Previous question – scores kept'); } }
+function restartQuestion() {
+  S.hist[S.q] = [0, 0, 0, 0]; S.seqs[S.q] = [{}, {}, {}, {}]; beginQuestion(S.q);
+}
+function updateBar() { $('#bNext').disabled = phase !== 'reveal'; $('#bPause').disabled = phase === 'reveal'; $('#bSkip').disabled = phase === 'reveal'; $('#bUndo').disabled = phase !== 'reveal'; $('#bNext').textContent = S.q >= N - 1 ? 'FINAL PODIUM ▶' : 'NEXT QUESTION ▶'; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- Start / navigation ---------- */
+function startGame() {
+  unlockAudio();
+  const hasProg = S.started && (S.q > 0 || S.hist.some(h => h.some(v => v)));
+  if (hasProg && !confirm('Continue the saved game?\nOK = continue, Cancel = start a new game')) { resetGame(); }
+  S.started = true; if (S.fs) toggleFs(true);
+  beginQuestion(S.q);
+}
+function resetGame() { stopTimer(); stopMusic(); const keep = { names: S.names, pre: S.pre, ans: S.ans, vol: S.vol, mute: S.mute, fs: S.fs }; S = Object.assign(fresh(), keep); S.started = true; undoStack = []; save(); }
+function goHome() { stopTimer(); stopMusic(); show('home'); }
+function toggleFs(force) {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {});
+  else if (!force) document.exitFullscreen();
+}
+
+/* ---------- Scoreboard ---------- */
+function openScore() { if (phase !== undefined && $('#game').classList.contains('active')) { stopMusicPauseOnly(); } renderScore(); const p = prevScreen; show('score'); prevScreen = p; }
+function stopMusicPauseOnly() { if (tm && !tm.paused) togglePause(); } // freeze timer while scoreboard is open
+function renderScore() {
+  const order = [0, 1, 2, 3].sort((a, b) => total(b) - total(a));
+  const rc = $('#rank'); rc.innerHTML = order.map((t, i) => `<div class="rcard"><div class="rk">#${i + 1}</div><div class="rn">${esc(S.names[t])}</div><div class="rs" data-v="${total(t)}">0</div></div>`).join('');
+  $$('#rank .rs').forEach(e => animNum(e, +e.dataset.v));
+  $('#hist').innerHTML = `<tr><th>TEAM</th>${questions.map((_, i) => `<th>Q${i + 1}</th>`).join('')}<th>ADJ</th><th>TOTAL</th></tr>` +
+    order.map(t => `<tr><td>${esc(S.names[t])}</td>${S.hist.map(h => `<td>${h[t]}</td>`).join('')}<td>${S.adj[t]}</td><td class="tot">${total(t)}</td></tr>`).join('');
+  $('#adjust').innerHTML = S.names.map((n, t) => `<span>${esc(n)}: <input type="number" id="adj${t}" value="0"> <button class="btn small" data-t="${t}">Apply adjustment</button></span>`).join('');
+  $$('#adjust button').forEach(b => b.onclick = () => { const t = +b.dataset.t; S.adj[t] += parseInt($('#adj' + t).value, 10) || 0; save(); renderScore(); if (phase === 'reveal') refreshScore(); });
+}
+function closeScore() { if (prevScreen === 'game') { show('game'); if (tm && tm.paused) toast('Timer is paused – press RESUME'); } else show(prevScreen || 'home'); }
+
+/* ---------- Settings ---------- */
+function openSettings() {
+  S.names.forEach((n, i) => $('#sName' + i).value = n);
+  $('#sPre').value = S.pre; $('#sAns').value = S.ans; $('#sVol').value = S.vol; $('#sMute').checked = S.mute; $('#sFs').checked = S.fs; show('settings');
+}
+function saveSettings() {
+  S.names = [0, 1, 2, 3].map(i => $('#sName' + i).value.trim() || 'TEAM ' + (i + 1));
+  S.pre = Math.max(3, parseInt($('#sPre').value, 10) || 10); S.ans = Math.max(5, parseInt($('#sAns').value, 10) || 20);
+  S.vol = +$('#sVol').value; S.mute = $('#sMute').checked; S.fs = $('#sFs').checked; applyVol(); save(); toast('Settings saved');
+}
+function readFile(f, cb) { const r = new FileReader(); r.onload = () => cb(r.result); r.readAsDataURL(f); }
+
+/* ---------- Podium ---------- */
+const RANKS = ['3rd', '2nd', '1st'], SLOT = ['p3', 'p2', 'p1'];
+let fx = null, fxRaf = 0, fxTimer = 0, lastAdded = -1;
+function openPodium() { stopTimer(); stopMusic(); S.podium = []; lastAdded = -1; save(); show('podium'); renderPodium(); }
+function renderPodium() {
+  const p = S.podium, done = p.length === 3;
+  $('#pTitle').textContent = done ? 'CHAMPION!' : `Choose the ${RANKS[p.length]} place team`;
+  $('#pChoices').innerHTML = done ? '' : [0, 1, 2, 3].filter(t => !p.includes(t)).map(t => `<button class="btn" data-t="${t}">${esc(S.names[t])}</button>`).join('');
+  $$('#pChoices button').forEach(b => b.onclick = () => { S.podium.push(+b.dataset.t); lastAdded = S.podium.length - 1; save(); renderPodium(); });
+  // DOM order: 3rd (left), 1st (centre), 2nd (right)
+  $('#stage').innerHTML = [0, 2, 1].map(i => {
+    const t = p[i], first = i === 2, cls = i === lastAdded ? '' : 'style="animation:none"';
+    const card = t === undefined ? '' : `<div class="pcard ${first ? 'first' : ''}" ${cls}>${first ? '<span class="crown">👑</span>' : ''}${esc(S.names[t])}${first ? '<span class="champ">CHAMPION!</span>' : ''}</div>`;
+    return `<div class="plat ${SLOT[i]}">${card}<span>${3 - i}</span></div>`;
+  }).join('');
+  stopFx(); if (p.length === 3) celebrate();
+}
+function undoPodium() { if (!S.podium.length) return; S.podium.pop(); lastAdded = -1; save(); renderPodium(); }
+function stopFx() { cancelAnimationFrame(fxRaf); clearInterval(fxTimer); fxRaf = fxTimer = 0; fx = null; const c = $('#fx'); if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height); $$('.spot').forEach(e => e.remove()); }
+function celebrate() { // confetti, coin rain, fireworks-style bursts after the winner lands
+  const c = $('#fx'); c.width = innerWidth; c.height = innerHeight; const g = c.getContext('2d'); const P = []; fx = true;
+  ['10%', '60%'].forEach(l => { const s = document.createElement('div'); s.className = 'spot'; s.style.left = l; $('#podium').appendChild(s); });
+  const burst = (x, y, n, col) => { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, v = 2 + Math.random() * 7; P.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: .12, life: 90, col, r: 3 }); } };
+  const rain = n => { for (let i = 0; i < n; i++) P.push({ x: Math.random() * c.width, y: -20, vx: (Math.random() - .5) * 2, vy: 2 + Math.random() * 4, g: .03, life: 400, col: Math.random() < .5 ? '#ffd54a' : ['#ff4d6d', '#4da3ff', '#5be37d', '#fff'][i % 4], r: 4 + Math.random() * 6, coin: Math.random() < .4 }); };
+  setTimeout(() => { if (!fx) return; rain(150); burst(c.width / 2, c.height * .3, 160, '#ffd54a'); }, 2200);
+  fxTimer = setInterval(() => { rain(8); if (Math.random() < .6) burst(Math.random() * c.width, Math.random() * c.height * .5, 50, ['#ffd54a', '#ff6b6b', '#7be0ff', '#fff'][Math.floor(Math.random() * 4)]); }, 700);
+  (function loop() {
+    g.clearRect(0, 0, c.width, c.height);
+    for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life--; if (p.life <= 0 || p.y > c.height + 30) { P.splice(i, 1); continue; }
+      g.globalAlpha = Math.min(1, p.life / 40); g.fillStyle = p.col; g.beginPath(); if (p.coin) g.ellipse(p.x, p.y, p.r, p.r * Math.abs(Math.cos(p.life / 8)) + 1, 0, 0, 6.28); else g.rect(p.x, p.y, p.r, p.r); g.fill(); }
+    if (P.length > 900) P.splice(0, P.length - 900);
+    fxRaf = requestAnimationFrame(loop);
+  })();
+}
+
+/* ---------- Wire up ---------- */
+$('#btnStart').onclick = startGame;
+$('#btnHomeScore').onclick = () => { prevScreen = 'home'; openScore(); };
+$('#btnHomeSettings').onclick = openSettings;
+$('#btnSave').onclick = saveSettings;
+$('#btnSettingsHome').onclick = () => show('home');
+$('#btnScoreBack').onclick = closeScore;
+$('#btnMusicTest').onclick = () => { S.vol = +$('#sVol').value; S.mute = $('#sMute').checked; playMusic(true); };
+$('#btnMusicStop').onclick = stopMusic;
+$('#sVol').oninput = e => { S.vol = +e.target.value; applyVol(); };
+$('#sMute').onchange = e => { S.mute = e.target.checked; applyVol(); };
+$('#sMusic').onchange = e => { const f = e.target.files[0]; if (!f) return; music.src = URL.createObjectURL(f); readFile(f, d => { try { localStorage.setItem(MKEY, d); } catch (x) { toast('Music too large to remember after reload'); } }); toast('Music replaced'); };
+$('#sBg').onchange = e => { const f = e.target.files[0]; if (!f) return; readFile(f, d => { try { localStorage.setItem(BGKEY, d); } catch (x) { toast('Image too large to save'); } setArt(d); toast('Background set'); }); };
+$('#btnBgClear').onclick = () => { localStorage.removeItem(BGKEY); setArt(null); toast('Background removed'); };
+$('#bPause').onclick = togglePause;
+$('#bSkip').onclick = () => { if (phase !== 'reveal') reveal(); };
+$('#bNext').onclick = next; $('#bPrev').onclick = prev; $('#bRestart').onclick = restartQuestion;
+$('#bUndo').onclick = undo; $('#bScore').onclick = () => { prevScreen = 'game'; openScore(); };
+$('#bFs').onclick = () => toggleFs(); $('#bHome').onclick = goHome;
+$('#btnPUndo').onclick = undoPodium;
+$('#btnPRestart').onclick = () => { if (confirm('Erase all scores and restart the game?')) { resetGame(); beginQuestion(0); } };
+$('#btnPHome').onclick = goHome;
+document.addEventListener('visibilitychange', () => { if (document.hidden && tm && !tm.paused) togglePause(); });
+window.addEventListener('resize', () => { const c = $('#fx'); if (fx) { c.width = innerWidth; c.height = innerHeight; } });
+show('home');
 })();
