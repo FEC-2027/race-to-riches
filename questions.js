@@ -33,10 +33,11 @@ const musicFiles = [
 // RACE TO RICHES – sound effects (put these files in the assets folder too).
 //   gong     : plays when the correct answer is revealed (Kahoot-style gong)
 //   points   : plays every time you click a +10 / +30 / +60 / +100 button
+// (The podium music already contains the applause and cheers, so there is no separate applause file.)
 // If a file is missing, that sound is simply skipped (the game keeps working).
 const soundFiles = {
   gong: "assets/kahoot-gong.mp3",
-  points: "assets/kahoot-point.mp3",
+  points: "assets/kahoot-point.mp3"
 };
 
 // RACE TO RICHES – background music (volume: 0 = silent ... 1 = full; keep it lower than the applause so cheers can be heard).
@@ -44,4 +45,4 @@ const soundFiles = {
 //   podiumMusic : FINAL PODIUM - starts automatically when the podium opens and plays ONCE (no repeat)
 // Both are silent during the questions.
 const homeMusic = { file: "assets/kahoot-lobby.mp3", volume: 0.8 };
-const podiumMusic = { file: "assets/kahoot-podium.mp3", volume: 0.5 };
+const podiumMusic = { file: "assets/kahoot-podium.mp3", volume: 0.8 };
