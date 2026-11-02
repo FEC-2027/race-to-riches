@@ -22,10 +22,21 @@ const questions = [
   { question: "Which is the correct spelling?", options: { blue: "Recieve", yellow: "Receve", green: "Receeve", red: "Receive" }, correctAnswer: "red" }
 ];
 
-// RACE TO RICHES – answering music. Put your 3 audio files in the assets folder and list them here.
+// RACE TO RICHES – answering (countdown) music. Put your 3 audio files in the assets folder and list them here.
 // One track is picked at random for each question (all 3 are used before any repeats).
 const musicFiles = [
   "assets/music1.mp3",
   "assets/music2.mp3",
   "assets/music3.mp3"
 ];
+
+// RACE TO RICHES – sound effects (put these files in the assets folder too).
+//   gong     : plays when the correct answer is revealed (Kahoot-style gong)
+//   points   : plays every time you click a +10 / +30 / +60 / +100 button
+//   applause : plays each time a team appears on the final podium
+// If a file is missing, that sound is simply skipped (the game keeps working).
+const soundFiles = {
+  gong: "assets/music4.mp3",
+  points: "assets/music5.mp3",
+  applause: "assets/music6.mp3"
+};
