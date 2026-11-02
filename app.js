@@ -41,7 +41,7 @@ function show(id) {
   document.body.classList.toggle('ingame', id === 'game'); setBar();
   $('#mall').classList.toggle('dim', id !== 'home');
   $('#mall').classList.toggle('art', id === 'home' && !!artUrl);
-  if (id !== 'podium') { stopFx(); clearTimeout(podTimer); }
+  if (id !== 'podium') { stopFx(); clearTimeout(podTimer); stopSfx(['applause']); }
   prevScreen = id === 'score' ? prevScreen : id;
 }
 function animNum(el, to) {
@@ -70,8 +70,19 @@ function pickTrack() { // shuffled "bag" so every track plays once before any re
 function stopMusic() { tracks.forEach(t => { t.pause(); try { t.currentTime = 0; } catch (e) {} }); }
 function playMusic() { stopMusic(); cur = pickTrack(); if (!cur) return; const p = cur.play(); if (p) p.catch(() => toast('Music could not play – check the audio files in assets/')); }
 function unlockAudio() { // called from the START click so iPad/Chrome allow playback later
-  tracks.forEach(t => { t.muted = true; const p = t.play(); const done = () => { t.pause(); try { t.currentTime = 0; } catch (e) {} t.muted = false; }; p ? p.then(done).catch(done) : done(); });
+  [...tracks, ...Object.values(sfx)].forEach(t => { t.muted = true; const p = t.play(); const done = () => { t.pause(); try { t.currentTime = 0; } catch (e) {} t.muted = false; }; p ? p.then(done).catch(done) : done(); });
 }
+
+/* ---------- Sound effects: gong (answer reveal), points (+ buttons), applause (podium) ---------- */
+const sfxFiles = Object.assign({ gong: 'assets/music4.mp3', points: 'assets/music5.mp3', applause: 'assets/music6.mp3' }, typeof soundFiles !== 'undefined' ? soundFiles : {});
+const sfx = {};
+Object.keys(sfxFiles).forEach(k => { const a = new Audio(sfxFiles[k]); a.preload = 'auto'; a.volume = 1; sfx[k] = a; });
+function playSfx(name) { // restarts from the beginning each time, so fast repeated clicks still sound
+  const a = sfx[name]; if (!a || S.mute) return;
+  try { a.pause(); a.currentTime = 0; } catch (e) {}
+  const p = a.play(); if (p) p.catch(() => {});
+}
+function stopSfx(names) { (names || Object.keys(sfx)).forEach(k => { const a = sfx[k]; if (a) { a.pause(); try { a.currentTime = 0; } catch (e) {} } }); }
 
 /* ---------- Timer (elapsed-time based, single instance) ---------- */
 function stopTimer() { clearInterval(timerId); timerId = null; tm = null; }
@@ -91,14 +102,14 @@ function tick() {
 }
 /* ---------- Question flow ---------- */
 function beginQuestion(i) {
-  stopTimer(); stopMusic(); S.q = i; undoStack = []; save(); show('game');
+  stopTimer(); stopMusic(); stopSfx(); S.q = i; undoStack = []; save(); show('game');
   const q = questions[i];
   $('#qnum').textContent = `QUESTION ${i + 1} / ${N}`; $('#qbox').textContent = q.question;
   $$('.ans').forEach(a => { a.classList.remove('win', 'dim'); a.querySelector('.atext').textContent = q.options[a.dataset.c]; });
   $('#scorepanel').innerHTML = ''; shown = []; startPhase('preview', S.pre);
 }
 function reveal() {
-  stopTimer(); stopMusic(); phase = 'reveal'; $('#game').className = 'screen active p-reveal'; fitQ();
+  stopTimer(); stopMusic(); stopSfx(); playSfx('gong'); phase = 'reveal'; $('#game').className = 'screen active p-reveal'; fitQ();
   const c = questions[S.q].correctAnswer;
   $$('.ans').forEach(a => { a.classList.toggle('win', a.dataset.c === c); a.classList.toggle('dim', a.dataset.c !== c); });
   $('#banner').textContent = `CORRECT ANSWER! ${c.toUpperCase()} – ${questions[S.q].options[c]}`;
@@ -122,7 +133,7 @@ function refreshScore(init) {
 function award(t, b) {
   const seq = S.seqs[S.q][t], n = seq[b] || 0, pts = b * 2 ** n;
   undoStack.push({ q: S.q, t, pts: S.hist[S.q][t], seq: { ...seq } });
-  S.hist[S.q][t] += pts; seq[b] = n + 1; save(); refreshScore();
+  S.hist[S.q][t] += pts; seq[b] = n + 1; save(); refreshScore(); playSfx('points');
   const el = $('#team' + t); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); toast(`${S.names[t]}: +${pts}`);
 }
 function zero(t) {
@@ -154,8 +165,8 @@ function startGame() {
   S.started = true; 
   beginQuestion(S.q);
 }
-function resetGame() { stopTimer(); stopMusic(); const keep = { names: S.names }; S = Object.assign(fresh(), keep); S.started = true; undoStack = []; save(); }
-function goHome() { clearTimeout(podTimer); stopTimer(); stopMusic(); show('home'); }
+function resetGame() { stopTimer(); stopMusic(); stopSfx(); const keep = { names: S.names }; S = Object.assign(fresh(), keep); S.started = true; undoStack = []; save(); }
+function goHome() { clearTimeout(podTimer); stopTimer(); stopMusic(); stopSfx(); show('home'); }
 function toggleFs() {
   const d = document, el = d.documentElement, on = d.fullscreenElement || d.webkitFullscreenElement;
   try {
@@ -184,7 +195,7 @@ function saveSettings() { S.names = [0, 1, 2, 3].map(i => $('#sName' + i).value.
 /* ---------- Podium ---------- */
 const RANKS = ['3rd', '2nd', '1st'], SLOT = ['p3', 'p2', 'p1'];
 let podMode = 'auto', autoRun = true, podTimer = 0, fx = null, fxRaf = 0, fxTimer = 0, lastAdded = -1;
-function openPodium() { stopTimer(); stopMusic(); podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; save(); show('podium'); renderPodium(); }
+function openPodium() { stopTimer(); stopMusic(); stopSfx(); podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; save(); show('podium'); renderPodium(); }
 function schedulePodium() { // Kahoot-style: 3rd, then 2nd, then 1st, with a pause for suspense
   clearTimeout(podTimer); if (podMode !== 'auto' || !autoRun || S.podium.length >= 3) return;
   const n = S.podium.length; podTimer = setTimeout(() => { if (!$('#podium').classList.contains('active')) return; const o = [0, 1, 2, 3].sort((x, y) => total(y) - total(x)); S.podium.push([o[2], o[1], o[0]][n]); lastAdded = n; save(); renderPodium(); }, n === 0 ? 1500 : n === 1 ? 3500 : 4500);
@@ -203,7 +214,8 @@ function renderPodium() {
     const card = t === undefined ? '' : `<div class="pcard ${first ? 'first' : ''}" ${cls}>${first ? '<span class="crown">👑</span>' : ''}${esc(S.names[t])}<span class="pts">${total(t)} pts</span>${first ? '<span class="champ">CHAMPION!</span>' : ''}</div>`;
     return `<div class="plat ${SLOT[i]}">${card}<span>${3 - i}</span></div>`;
   }).join('');
-  stopFx(); schedulePodium(); if (p.length > 0 && p.length === lastAdded + 1) celebrate(p.length === 3 ? 2 : 1);
+  stopFx(); schedulePodium(); const added = p.length > 0 && p.length === lastAdded + 1;
+  if (added) { playSfx('applause'); celebrate(p.length === 3 ? 2 : 1); } else stopSfx(['applause']);
 }
 function undoPodium() { clearTimeout(podTimer); autoRun = false; if (!S.podium.length) return renderPodium(); S.podium.pop(); lastAdded = -1; save(); renderPodium(); }
 function stopFx() { cancelAnimationFrame(fxRaf); clearInterval(fxTimer); fxRaf = fxTimer = 0; fx = null; const c = $('#fx'); if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height); $$('.spot').forEach(e => e.remove()); }
