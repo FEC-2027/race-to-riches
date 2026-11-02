@@ -21,3 +21,11 @@ const questions = [
   { question: "What do we call money in coins and notes?", options: { blue: "Weather", yellow: "Furniture", green: "Cash", red: "Fashion" }, correctAnswer: "green" },
   { question: "Which is the correct spelling?", options: { blue: "Recieve", yellow: "Receve", green: "Receeve", red: "Receive" }, correctAnswer: "red" }
 ];
+
+// RACE TO RICHES – answering music. Put your 3 audio files in the assets folder and list them here.
+// One track is picked at random for each question (all 3 are used before any repeats).
+const musicFiles = [
+  "assets/music1.mp3",
+  "assets/music2.mp3",
+  "assets/music3.mp3"
+];
