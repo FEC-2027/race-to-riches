@@ -33,9 +33,23 @@ button,input,table{font-family:var(--f)}
 .screen.active{display:flex;opacity:1;animation:fade .6s}
 @keyframes fade{from{opacity:0;transform:scale(1.02)}}
 /* Gold type */
-.title{font-family:var(--f);font-size:min(11vw,calc(var(--vh)*19));margin:0;letter-spacing:.03em;line-height:1;
- background:linear-gradient(#fff6c8 8%,#f0c24a 40%,#9b6a12 56%,#f7dd86 78%,#b4811f);-webkit-background-clip:text;background-clip:text;color:transparent;
- filter:drop-shadow(0 4px 0 #4a2f05) drop-shadow(0 0 26px rgba(255,190,60,.55))}
+/* ===== 3D pop-up title: each letter drops in with a bounce, has a solid gold extrusion, and a shine sweeps across it ===== */
+.title{font-family:var(--f);font-size:min(11vw,calc(var(--vh)*19));margin:0 0 .1em;line-height:1.05;letter-spacing:.02em;text-align:center;
+ display:flex;flex-wrap:wrap;justify-content:center;gap:0 .3em;perspective:900px;filter:drop-shadow(0 0 .28em rgba(255,185,50,.55))}
+.title .w{display:inline-flex;white-space:nowrap}
+.title .l{position:relative;display:inline-block;color:transparent;padding:0 .08em .12em 0;transform-style:preserve-3d;
+ animation:letterPop 1.2s cubic-bezier(.2,1.5,.35,1) backwards;animation-delay:calc(var(--i)*.07s + .2s);transition:transform .18s}
+.title .l::before,.title .l::after{content:attr(data-t);position:absolute;left:0;top:0;white-space:pre}
+.title .l::before{z-index:0;color:#8a5a00;text-shadow:0.0065em 0.0075em 0 #e0a91e,0.0130em 0.0150em 0 #d49d1a,0.0195em 0.0225em 0 #c89317,0.0260em 0.0300em 0 #bb8914,0.0325em 0.0375em 0 #ae7f12,0.0390em 0.0450em 0 #a17510,0.0455em 0.0525em 0 #946c0e,0.0520em 0.0600em 0 #87630d,0.0585em 0.0675em 0 #7b5a0b,0.0650em 0.0750em 0 #6f520a,0.0715em 0.0825em 0 #634909,0.0780em 0.0900em 0 #584108,0.0845em 0.0975em 0 #4e3a07,0.0910em 0.1050em 0 #443306,0.0975em 0.1125em 0 #3b2d05,0.1040em 0.1200em 0 #322604,.13em .16em .07em rgba(0,0,0,.45),.2em .26em .22em rgba(0,0,0,.45)}
+.title .l::after{z-index:1;color:transparent;-webkit-text-stroke:.012em #fff4b8;
+ background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.95) 50%,transparent 62%) no-repeat -160% 0/70% 100%,
+  linear-gradient(180deg,#fffbd6 4%,#ffe680 28%,#f6c334 49%,#b97d0a 51%,#e9b92c 74%,#fff0a8 100%);
+ -webkit-background-clip:text;background-clip:text;animation:faceShine 5.5s ease-in-out infinite;animation-delay:calc(var(--i)*.11s + 1.8s)}
+.title .l:hover{transform:translateY(-.07em) scale(1.1) rotateX(-10deg)}
+@keyframes letterPop{0%{opacity:0;transform:translateY(-1.3em) translateZ(-320px) rotateX(-100deg) scale(.25)}
+ 55%{opacity:1;transform:translateY(.07em) rotateX(12deg) scale(1.18)}78%{transform:translateY(-.025em) rotateX(-5deg) scale(.97)}100%{opacity:1;transform:none}}
+@keyframes faceShine{0%{background-position:-160% 0,0 0}38%,100%{background-position:260% 0,0 0}}
+@media (prefers-reduced-motion:reduce){.title .l,.title .l::after{animation:none}}
 .sub{font-family:var(--f);font-size:min(3vw,calc(var(--vh)*5));letter-spacing:.7em;color:var(--gold);margin:calc(var(--vh)*1) 0 calc(var(--vh)*5);text-shadow:0 0 14px rgba(255,190,60,.6)}
 .btn{cursor:pointer;border:2px solid #fff0b0;border-radius:999px;padding:.8em 1.8em;font-size:clamp(14px,1.6vw,26px);color:#3a2504;
  background:linear-gradient(#fff2b0,#e8b93c 55%,#b27d1c);box-shadow:0 6px 0 #6b4709,0 10px 24px rgba(0,0,0,.5),0 0 20px rgba(255,200,70,.35);margin:calc(var(--vh)*.6) .8vw;transition:transform .15s,filter .15s}
