@@ -212,10 +212,19 @@ function saveSettings() { S.names = [0, 1, 2, 3].map(i => $('#sName' + i).value.
 /* ---------- Podium ---------- */
 const RANKS = ['3rd', '2nd', '1st'], SLOT = ['p3', 'p2', 'p1'];
 let podMode = 'auto', autoRun = true, podTimer = 0, fx = null, fxRaf = 0, fxTimer = 0, lastAdded = -1;
-function openPodium() { stopTimer(); stopMusic(); stopSfx(); podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; save(); show('podium'); renderPodium(); }
-function schedulePodium() { // Kahoot-style: 3rd, then 2nd, then 1st, with a pause for suspense
+function openPodium() { stopTimer(); stopMusic(); stopSfx(); podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; save(); podStart = performance.now(); show('podium'); renderPodium(); }
+let podStart = 0; // when the podium tune was started (fallback clock if the audio cannot play)
+const podCues = (typeof podiumCues !== 'undefined' && podiumCues.length === 3) ? podiumCues : [3, 7.5, 13.5]; // seconds into the podium tune: 3rd, 2nd, 1st appear
+function podClock() { return (!bgPod.paused && bgPod.currentTime > 0) ? bgPod.currentTime : (performance.now() - podStart) / 1000; }
+function schedulePodium() { // each team appears exactly when the podium tune reaches its cue time
   clearTimeout(podTimer); if (podMode !== 'auto' || !autoRun || S.podium.length >= 3) return;
-  const n = S.podium.length; podTimer = setTimeout(() => { if (!$('#podium').classList.contains('active')) return; const o = [0, 1, 2, 3].sort((x, y) => total(y) - total(x)); S.podium.push([o[2], o[1], o[0]][n]); lastAdded = n; save(); renderPodium(); }, n === 0 ? 1500 : n === 1 ? 3500 : 4500);
+  const n = S.podium.length;
+  podTimer = setInterval(() => {
+    if (!$('#podium').classList.contains('active')) { clearInterval(podTimer); return; }
+    if (podClock() < podCues[n]) return;
+    clearInterval(podTimer);
+    const o = [0, 1, 2, 3].sort((x, y) => total(y) - total(x)); S.podium.push([o[2], o[1], o[0]][n]); lastAdded = n; save(); renderPodium();
+  }, 40);
 }
 function renderPodium() {
   const p = S.podium, done = p.length === 3;
@@ -264,8 +273,8 @@ $('#bNext').onclick = next; $('#bPrev').onclick = prev;
 
 $('#bFs').onclick = toggleFs; $('#bHome').onclick = goHome;
 $('#btnPUndo').onclick = undoPodium;
-$('#btnPReplay').onclick = () => { podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; renderPodium(); };
-$('#btnPMode').onclick = () => { clearTimeout(podTimer); podMode = podMode === 'auto' ? 'manual' : 'auto'; autoRun = podMode === 'auto'; S.podium = []; lastAdded = -1; renderPodium(); };
+$('#btnPReplay').onclick = () => { clearTimeout(podTimer); podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; playPodMusic(); podStart = performance.now(); renderPodium(); };
+$('#btnPMode').onclick = () => { clearTimeout(podTimer); podMode = podMode === 'auto' ? 'manual' : 'auto'; autoRun = podMode === 'auto'; S.podium = []; lastAdded = -1; if (autoRun) { playPodMusic(); podStart = performance.now(); } renderPodium(); };
 let endArm = 0; // two-click confirm (browser pop-up dialogs can be blocked)
 $('#bEnd').onclick = () => {
   const b = $('#bEnd'); if (endArm) { clearTimeout(endArm); endArm = 0; b.textContent = 'END GAME → PODIUM'; openPodium(); return; }
