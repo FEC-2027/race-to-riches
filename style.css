@@ -169,3 +169,7 @@ td.tot{color:#ffe680}
 #qbox{line-height:1.15}
 body.ingame #coins{display:none}
 #coins{display:none!important}
+
+html{-webkit-text-size-adjust:100%}
+button,.btn,.sbtn{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+input{font-size:max(16px,1.1em)!important}
