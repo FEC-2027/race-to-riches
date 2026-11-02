@@ -2,7 +2,7 @@
 (() => {
 'use strict';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
-const KEY = 'rtr_state_v1', BGKEY = 'rtr_bg', MKEY = 'rtr_music';
+const KEY = 'rtr_state_v1';
 const N = questions.length, COLORS = ['blue', 'yellow', 'green', 'red'], BTNS = [10, 30, 60, 100];
 
 /* ---------- State ---------- */
@@ -53,19 +53,24 @@ function animNum(el, to) {
 /* ---------- Background art & decorations ---------- */
 let artUrl = null;
 function setArt(url) { artUrl = url; $('#mall').style.setProperty('--art', url ? `url("${url}")` : 'none'); $('#mall').classList.toggle('art', !!url && $('#home').classList.contains('active')); }
-(function loadArt() {
-  const up = localStorage.getItem(BGKEY); if (up) return setArt(up);
-  const im = new Image(); im.onload = () => setArt('assets/race-to-riches-bg.png'); im.src = 'assets/race-to-riches-bg.png';
-})();
-/* ---------- Music ---------- */
-const music = new Audio('assets/answering-music.mp3'); music.loop = true; music.preload = 'auto';
-try { const m = localStorage.getItem(MKEY); if (m) music.src = m; } catch (e) {}
-const applyVol = () => { music.volume = S.vol; music.muted = S.mute; };
-function playMusic(restart) { applyVol(); if (restart) music.currentTime = 0; const p = music.play(); if (p) p.catch(() => toast('Music blocked or missing – click anywhere & resume')); }
-function stopMusic() { music.pause(); try { music.currentTime = 0; } catch (e) {} }
-function unlockAudio() { // called from a click so browsers allow later playback
-  music.muted = true; const p = music.play(); const done = () => { music.pause(); music.currentTime = 0; applyVol(); };
-  p ? p.then(done).catch(done) : done();
+(function loadArt() { const im = new Image(); im.onload = () => setArt('assets/race-to-riches-bg.png'); im.src = 'assets/race-to-riches-bg.png'; })();
+
+/* ---------- Music: 3 embedded tracks, random per question ---------- */
+const tracks = (typeof musicFiles !== 'undefined' ? musicFiles : []).map(src => { const t = new Audio(src); t.loop = true; t.preload = 'auto'; t.volume = 1; return t; });
+let bag = [], cur = null;
+function pickTrack() { // shuffled "bag" so every track plays once before any repeats
+  if (!tracks.length) return null;
+  if (!bag.length) {
+    bag = tracks.map((_, i) => i);
+    for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+    if (cur && bag.length > 1 && bag[0] === tracks.indexOf(cur)) bag.push(bag.shift());
+  }
+  return tracks[bag.shift()];
+}
+function stopMusic() { tracks.forEach(t => { t.pause(); try { t.currentTime = 0; } catch (e) {} }); }
+function playMusic() { stopMusic(); cur = pickTrack(); if (!cur) return; const p = cur.play(); if (p) p.catch(() => toast('Music could not play – check the audio files in assets/')); }
+function unlockAudio() { // called from the START click so iPad/Chrome allow playback later
+  tracks.forEach(t => { t.muted = true; const p = t.play(); const done = () => { t.pause(); try { t.currentTime = 0; } catch (e) {} t.muted = false; }; p ? p.then(done).catch(done) : done(); });
 }
 
 /* ---------- Timer (elapsed-time based, single instance) ---------- */
@@ -73,7 +78,7 @@ function stopTimer() { clearInterval(timerId); timerId = null; tm = null; }
 function startPhase(name, secs) {
   stopTimer(); phase = name; tm = { name, endAt: performance.now() + secs * 1000, rem: secs * 1000, paused: false };
   $('#game').className = 'screen active p-' + name; setBar(); fitQ(); requestAnimationFrame(fitQ); setTimeout(fitQ, 400);
-  setTimerText(secs); if (name === 'answer') playMusic(true); else stopMusic();
+  setTimerText(secs); if (name === 'answer') playMusic(); else stopMusic();
   timerId = setInterval(tick, 100); updateBar();
 }
 function setTimerText(sec) { const t = $('#timer'); t.textContent = sec; t.classList.toggle('warn', phase === 'answer' && sec <= 5 && sec > 0); t.classList.toggle('zero', sec === 0); }
@@ -84,12 +89,6 @@ function tick() {
   const n = tm.name; stopTimer();             // stop first => no double transitions
   if (n === 'preview') startPhase('answer', S.ans); else reveal();
 }
-function togglePause() {
-  if (!tm) return;
-  if (!tm.paused) { tm.rem = Math.max(0, tm.endAt - performance.now()); tm.paused = true; music.pause(); }
-  else { tm.endAt = performance.now() + tm.rem; tm.paused = false; if (tm.name === 'answer') playMusic(false); ; }
-}
-
 /* ---------- Question flow ---------- */
 function beginQuestion(i) {
   stopTimer(); stopMusic(); S.q = i; undoStack = []; save(); show('game');
@@ -152,19 +151,21 @@ function startGame() {
   unlockAudio();
   const hasProg = S.started && (S.q > 0 || S.hist.some(h => h.some(v => v)));
   if (hasProg && !confirm('Continue the saved game?\nOK = continue, Cancel = start a new game')) { resetGame(); }
-  S.started = true; if (S.fs) toggleFs(true);
+  S.started = true; 
   beginQuestion(S.q);
 }
-function resetGame() { stopTimer(); stopMusic(); const keep = { names: S.names, pre: S.pre, ans: S.ans, vol: S.vol, mute: S.mute, fs: S.fs }; S = Object.assign(fresh(), keep); S.started = true; undoStack = []; save(); }
+function resetGame() { stopTimer(); stopMusic(); const keep = { names: S.names }; S = Object.assign(fresh(), keep); S.started = true; undoStack = []; save(); }
 function goHome() { clearTimeout(podTimer); stopTimer(); stopMusic(); show('home'); }
-function toggleFs(force) {
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {});
-  else if (!force) document.exitFullscreen();
+function toggleFs() {
+  const d = document, el = d.documentElement, on = d.fullscreenElement || d.webkitFullscreenElement;
+  try {
+    if (!on) { const f = el.requestFullscreen || el.webkitRequestFullscreen; f ? f.call(el) : toast('Full-screen is not available here – on iPad use Share > Add to Home Screen'); }
+    else (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+  } catch (e) {}
 }
 
 /* ---------- Scoreboard ---------- */
-function openScore() { if (phase !== undefined && $('#game').classList.contains('active')) { stopMusicPauseOnly(); } renderScore(); const p = prevScreen; show('score'); prevScreen = p; }
-function stopMusicPauseOnly() { if (tm && !tm.paused) togglePause(); } // freeze timer while scoreboard is open
+function openScore() { renderScore(); const p = prevScreen; show('score'); prevScreen = p; }
 function renderScore() {
   const order = [0, 1, 2, 3].sort((a, b) => total(b) - total(a));
   const rc = $('#rank'); rc.innerHTML = order.map((t, i) => `<div class="rcard"><div class="rk">#${i + 1}</div><div class="rn">${esc(S.names[t])}</div><div class="rs" data-v="${total(t)}">0</div></div>`).join('');
@@ -174,19 +175,11 @@ function renderScore() {
   $('#adjust').innerHTML = S.names.map((n, t) => `<span>${esc(n)}: <input type="number" id="adj${t}" value="0"> <button class="btn small" data-t="${t}">Apply adjustment</button></span>`).join('');
   $$('#adjust button').forEach(b => b.onclick = () => { const t = +b.dataset.t; S.adj[t] += parseInt($('#adj' + t).value, 10) || 0; save(); renderScore(); if (phase === 'reveal') refreshScore(); });
 }
-function closeScore() { if (prevScreen === 'game') { show('game'); if (tm && tm.paused) toast('Timer is paused – press RESUME'); } else show(prevScreen || 'home'); }
+function closeScore() { if (prevScreen === 'game') { show('game'); } else show(prevScreen || 'home'); }
 
 /* ---------- Settings ---------- */
-function openSettings() {
-  S.names.forEach((n, i) => $('#sName' + i).value = n);
-  $('#sPre').value = S.pre; $('#sAns').value = S.ans; $('#sVol').value = S.vol; $('#sMute').checked = S.mute; $('#sFs').checked = S.fs; show('settings');
-}
-function saveSettings() {
-  S.names = [0, 1, 2, 3].map(i => $('#sName' + i).value.trim() || 'TEAM ' + (i + 1));
-  S.pre = Math.max(3, parseInt($('#sPre').value, 10) || 10); S.ans = Math.max(5, parseInt($('#sAns').value, 10) || 20);
-  S.vol = +$('#sVol').value; S.mute = $('#sMute').checked; S.fs = $('#sFs').checked; applyVol(); save(); toast('Settings saved');
-}
-function readFile(f, cb) { const r = new FileReader(); r.onload = () => cb(r.result); r.readAsDataURL(f); }
+function openSettings() { S.names.forEach((n, i) => $('#sName' + i).value = n); show('settings'); }
+function saveSettings() { S.names = [0, 1, 2, 3].map(i => $('#sName' + i).value.trim() || 'TEAM ' + (i + 1)); save(); toast('Team names saved'); }
 
 /* ---------- Podium ---------- */
 const RANKS = ['3rd', '2nd', '1st'], SLOT = ['p3', 'p2', 'p1'];
@@ -237,17 +230,10 @@ $('#btnHomeSettings').onclick = openSettings;
 $('#btnSave').onclick = saveSettings;
 $('#btnSettingsHome').onclick = () => show('home');
 $('#btnScoreBack').onclick = closeScore;
-$('#btnMusicTest').onclick = () => { S.vol = +$('#sVol').value; S.mute = $('#sMute').checked; playMusic(true); };
-$('#btnMusicStop').onclick = stopMusic;
-$('#sVol').oninput = e => { S.vol = +e.target.value; applyVol(); };
-$('#sMute').onchange = e => { S.mute = e.target.checked; applyVol(); };
-$('#sMusic').onchange = e => { const f = e.target.files[0]; if (!f) return; music.src = URL.createObjectURL(f); readFile(f, d => { try { localStorage.setItem(MKEY, d); } catch (x) { toast('Music too large to remember after reload'); } }); toast('Music replaced'); };
-$('#sBg').onchange = e => { const f = e.target.files[0]; if (!f) return; readFile(f, d => { try { localStorage.setItem(BGKEY, d); } catch (x) { toast('Image too large to save'); } setArt(d); toast('Background set'); }); };
-$('#btnBgClear').onclick = () => { localStorage.removeItem(BGKEY); setArt(null); toast('Background removed'); };
 $('#bSkip').onclick = () => { if (phase !== 'reveal') reveal(); };
 $('#bNext').onclick = next; $('#bPrev').onclick = prev;
 
-$('#bFs').onclick = () => toggleFs(); $('#bHome').onclick = goHome;
+$('#bFs').onclick = toggleFs; $('#bHome').onclick = goHome;
 $('#btnPUndo').onclick = undoPodium;
 $('#btnPReplay').onclick = () => { podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; renderPodium(); };
 $('#btnPMode').onclick = () => { clearTimeout(podTimer); podMode = podMode === 'auto' ? 'manual' : 'auto'; autoRun = podMode === 'auto'; S.podium = []; lastAdded = -1; renderPodium(); };
