@@ -25,12 +25,13 @@ function fitQ() { // preview: make the question as LARGE as possible while still
   if (phase !== 'preview' || !$('#game').classList.contains('active')) return;
   const vh = (window.visualViewport ? visualViewport.height : innerHeight) / 100;
   let fs = Math.min(innerWidth * 0.11, vh * 22), n = 0; q.style.fontSize = fs + 'px';
-  while (q.scrollHeight > q.clientHeight + 2 && fs > 18 && n++ < 80) { fs *= 0.95; q.style.fontSize = fs + 'px'; }
+  const floor = Math.max(28, vh * 7); if (q.clientHeight < 60) return;
+  while (q.scrollHeight > q.clientHeight + 2 && fs > floor && n++ < 80) { fs *= 0.95; q.style.fontSize = fs + 'px'; }
 }
-function refit() { setVh(); setBar(); fitQ(); requestAnimationFrame(fitQ); }
+function refit() { setVh(); setBar(); fitQ(); requestAnimationFrame(fitQ); setTimeout(fitQ, 400); }
 setVh(); window.addEventListener('resize', refit); window.addEventListener('orientationchange', () => setTimeout(refit, 250));
 if (window.visualViewport) visualViewport.addEventListener('resize', refit);
-if (window.ResizeObserver) new ResizeObserver(() => { setBar(); }).observe($('#bar'));
+if (window.ResizeObserver) { new ResizeObserver(() => { setBar(); }).observe($('#bar')); new ResizeObserver(() => { if (phase === 'preview') fitQ(); }).observe($('#qbox')); }
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
 
 /* ---------- Helpers ---------- */
@@ -56,12 +57,6 @@ function setArt(url) { artUrl = url; $('#mall').style.setProperty('--art', url ?
   const up = localStorage.getItem(BGKEY); if (up) return setArt(up);
   const im = new Image(); im.onload = () => setArt('assets/race-to-riches-bg.png'); im.src = 'assets/race-to-riches-bg.png';
 })();
-(function decor() {
-  const c = $('#coins'); let h = '';
-  for (let i = 0; i < 6; i++) h += `<div class="gem" style="left:${Math.random() * 95}%;top:${Math.random() * 85}%;font-size:${22 + Math.random() * 26}px;animation-delay:${-Math.random() * 6}s">${['💎', '👑', '✨', '💍', '⌚'][i % 5]}</div>`;
-  c.innerHTML = h;
-})();
-
 /* ---------- Music ---------- */
 const music = new Audio('assets/answering-music.mp3'); music.loop = true; music.preload = 'auto';
 try { const m = localStorage.getItem(MKEY); if (m) music.src = m; } catch (e) {}
@@ -77,7 +72,7 @@ function unlockAudio() { // called from a click so browsers allow later playback
 function stopTimer() { clearInterval(timerId); timerId = null; tm = null; }
 function startPhase(name, secs) {
   stopTimer(); phase = name; tm = { name, endAt: performance.now() + secs * 1000, rem: secs * 1000, paused: false };
-  $('#game').className = 'screen active p-' + name; setBar(); fitQ(); requestAnimationFrame(fitQ);
+  $('#game').className = 'screen active p-' + name; setBar(); fitQ(); requestAnimationFrame(fitQ); setTimeout(fitQ, 400);
   setTimerText(secs); if (name === 'answer') playMusic(true); else stopMusic();
   timerId = setInterval(tick, 100); updateBar();
 }
