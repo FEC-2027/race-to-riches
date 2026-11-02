@@ -44,8 +44,8 @@ const soundFiles = {
 //   homeMusic   : HOMEPAGE (and Settings) - loops until you start the game
 //   podiumMusic : FINAL PODIUM - starts automatically when the podium opens and plays ONCE (no repeat)
 // Both are silent during the questions.
-const homeMusic = { file: "assets/kahoot-lobby.mp3", volume: 0.5 };
-const podiumMusic = { file: "assets/kahoot-podium.mp3", volume: 0.5 };
+const homeMusic = { file: "assets/kahoot-lobby.mp3", volume: 1.5 };
+const podiumMusic = { file: "assets/kahoot-podium.mp3", volume: 1.5 };
 
 // RACE TO RICHES – podium timing (AUTO mode). Seconds into the podium music when each team starts to appear:
 //   [ 3rd place, 2nd place, 1st place (champion) ]
