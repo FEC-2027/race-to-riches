@@ -1,160 +1,106 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#090d17">
-  <title>Race to Riches — English Camp</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Race to Riches – English Camp</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="ambient" aria-hidden="true">
-    <div class="ambient-glow glow-a"></div><div class="ambient-glow glow-b"></div>
-    <div id="coin-layer"></div><div id="sparkle-layer"></div>
+<div class="mall" id="mall"></div>
+<div id="coins"></div>
+
+<!-- HOME -->
+<section id="home" class="screen active">
+  <h1 class="title">RACE TO RICHES</h1>
+  <div class="sub">ENGLISH CAMP</div>
+  <button class="btn start" id="btnStart">START GAME</button>
+  <div class="row">
+    <button class="btn" id="btnHomeScore">SCOREBOARD</button>
+    <button class="btn" id="btnHomeSettings">SETTINGS</button>
   </div>
+</section>
 
-  <main id="app" class="app-shell">
-    <header class="topbar">
-      <button class="brand-mini" data-action="home" aria-label="Return to home">✦ RACE TO RICHES</button>
-      <div class="topbar-right">
-        <span id="round-indicator" class="round-indicator">ENGLISH CAMP</span>
-        <button class="icon-button" data-action="fullscreen" title="Toggle full screen" aria-label="Toggle full screen">⛶</button>
-      </div>
-    </header>
+<!-- SETTINGS -->
+<section id="settings" class="screen">
+  <div class="panel">
+    <h2>Settings</h2>
+    <div class="grid2">
+      <label>Team 1 <input id="sName0"></label><label>Team 2 <input id="sName1"></label>
+      <label>Team 3 <input id="sName2"></label><label>Team 4 <input id="sName3"></label>
+      <label>Question preview (seconds) <input id="sPre" type="number" min="3" max="120"></label>
+      <label>Answering time (seconds) <input id="sAns" type="number" min="5" max="300"></label>
+      <label>Answering music (MP3) <input id="sMusic" type="file" accept="audio/*"></label>
+      <label>Music volume <input id="sVol" type="range" min="0" max="1" step="0.05"></label>
+      <label><input id="sMute" type="checkbox"> Mute music</label>
+      <label><input id="sFs" type="checkbox"> Go full-screen when game starts</label>
+      <label>Homepage background image <input id="sBg" type="file" accept="image/*"></label>
+      <label>&nbsp;<button class="btn small" id="btnBgClear">Remove uploaded background</button></label>
+    </div>
+    <div class="row">
+      <button class="btn small" id="btnMusicTest">Preview music</button>
+      <button class="btn small" id="btnMusicStop">Stop preview</button>
+      <button class="btn small" id="btnSave">SAVE SETTINGS</button>
+      <button class="btn small" id="btnSettingsHome">RETURN TO HOME</button>
+    </div>
+  </div>
+</section>
 
-    <section id="home-screen" class="screen active">
-      <div class="hero-copy">
-        <p class="eyebrow">WELCOME TO THE GRAND ATRIUM</p>
-        <h1 class="hero-title">RACE <span>TO</span><br>RICHES</h1>
-        <p class="hero-subtitle">ENGLISH CAMP</p>
-        <p class="hero-tagline">Think fast. Choose wisely. Claim the treasure.</p>
-        <div class="hero-actions">
-          <button class="gold-button primary-button" data-action="start">START GAME <span>➜</span></button>
-          <button class="glass-button" data-action="scoreboard">♛ SCOREBOARD</button>
-          <button class="glass-button" data-action="settings">⚙ SETTINGS</button>
-        </div>
-      </div>
-      <div class="mall-scene" aria-hidden="true">
-        <div class="mall-ceiling"></div>
-        <div class="mall-balcony balcony-one"><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="mall-balcony balcony-two"><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="store-row">
-          <div class="store"><b>DIAMONDS</b><span>◇ ✧ ◇</span></div>
-          <div class="store"><b>MAISON D'OR</b><span>✦ LUXURY ✦</span></div>
-          <div class="store"><b>TIMEPIECES</b><span>◷ ◷ ◷</span></div>
-        </div>
-        <div class="mall-floor"></div>
-        <div class="treasure-display"><span>♛</span><b>THE GOLDEN COLLECTION</b><small>EXCLUSIVE • PRECIOUS • TIMELESS</small></div>
-      </div>
-      <div class="hero-decor decor-diamond">◇</div><div class="hero-decor decor-crown">♛</div>
-    </section>
+<!-- GAME -->
+<section id="game" class="screen">
+  <div id="timer">10</div>
+  <div id="qnum">QUESTION 1 / 20</div>
+  <div id="qbox"></div>
+  <div id="answers">
+    <div class="ans blue" data-c="blue"><span class="sym">▲</span><span class="atext"></span></div>
+    <div class="ans yellow" data-c="yellow"><span class="sym">◆</span><span class="atext"></span></div>
+    <div class="ans green" data-c="green"><span class="sym">●</span><span class="atext"></span></div>
+    <div class="ans red" data-c="red"><span class="sym">■</span><span class="atext"></span></div>
+  </div>
+  <div id="banner">CORRECT ANSWER!</div>
+  <div id="scorepanel"></div>
+</section>
 
-    <section id="game-screen" class="screen">
-      <div class="game-meta">
-        <span id="question-count" class="eyebrow">QUESTION 1 / 20</span>
-        <span id="phase-label" class="phase-pill">QUESTION PREVIEW</span>
-      </div>
-      <div id="preview-panel" class="preview-panel">
-        <div class="preview-kicker">YOUR NEXT CHALLENGE</div>
-        <h2 id="preview-question" class="preview-question">Question text appears here</h2>
-        <div id="preview-timer" class="preview-timer">10</div>
-        <p class="preview-hint">Read carefully. The answer zones are coming...</p>
-      </div>
-      <div id="answer-layout" class="answer-layout hidden">
-        <div class="question-strip">
-          <div><span id="answer-q-number">Q1</span><h2 id="answer-question">Question text</h2></div>
-          <div class="answer-clock"><span id="answer-timer">20</span><small>SECONDS</small></div>
-        </div>
-        <div class="answer-grid">
-          <div class="answer-tile blue" data-colour="blue"><span class="answer-symbol">●</span><span class="answer-name">BLUE</span><p id="option-blue"></p></div>
-          <div class="answer-tile yellow" data-colour="yellow"><span class="answer-symbol">◆</span><span class="answer-name">YELLOW</span><p id="option-yellow"></p></div>
-          <div class="answer-tile green" data-colour="green"><span class="answer-symbol">▲</span><span class="answer-name">GREEN</span><p id="option-green"></p></div>
-          <div class="answer-tile red" data-colour="red"><span class="answer-symbol">■</span><span class="answer-name">RED</span><p id="option-red"></p></div>
-        </div>
-      </div>
-      <div id="reveal-layout" class="reveal-layout hidden">
-        <div class="reveal-heading"><span class="eyebrow">THE MOMENT OF TRUTH</span><h2>CORRECT ANSWER!</h2><p id="correct-answer-copy"></p></div>
-        <div class="reveal-options answer-grid compact-grid">
-          <div class="answer-tile blue" data-colour="blue"><span class="answer-symbol">●</span><span class="answer-name">BLUE</span><p id="reveal-blue"></p></div>
-          <div class="answer-tile yellow" data-colour="yellow"><span class="answer-symbol">◆</span><span class="answer-name">YELLOW</span><p id="reveal-yellow"></p></div>
-          <div class="answer-tile green" data-colour="green"><span class="answer-symbol">▲</span><span class="answer-name">GREEN</span><p id="reveal-green"></p></div>
-          <div class="answer-tile red" data-colour="red"><span class="answer-symbol">■</span><span class="answer-name">RED</span><p id="reveal-red"></p></div>
-        </div>
-        <div class="scoring-wrap">
-          <div class="scoring-title"><span>♛</span> AWARD YOUR TEAM POINTS</div>
-          <div id="team-scoring" class="team-scoring"></div>
-          <div class="score-actions">
-            <button class="glass-button small-button" data-action="undo">↶ UNDO LAST ACTION</button>
-            <button class="gold-button small-button" data-action="next">NEXT QUESTION ➜</button>
-          </div>
-        </div>
-      </div>
-      <div class="teacher-dock">
-        <button class="dock-button" data-action="pause" id="pause-button">Ⅱ PAUSE</button>
-        <button class="dock-button" data-action="resume" id="resume-button" disabled>▶ RESUME</button>
-        <button class="dock-button" data-action="skip">SKIP TO REVEAL</button>
-        <button class="dock-button" data-action="restart-question">↻ RESTART Q</button>
-        <button class="dock-button" data-action="previous">← PREVIOUS</button>
-        <button class="dock-button" data-action="scoreboard">♛ SCORES</button>
-      </div>
-    </section>
+<!-- SCOREBOARD -->
+<section id="score" class="screen">
+  <div class="panel wide">
+    <h2>Golden Scoreboard</h2>
+    <div id="rank"></div>
+    <div class="tablewrap"><table id="hist"></table></div>
+    <div class="row adj" id="adjust"></div>
+    <div class="row">
+      <button class="btn small" id="btnScoreBack">RETURN</button>
+    </div>
+  </div>
+</section>
 
-    <section id="scoreboard-screen" class="screen">
-      <div class="section-heading"><p class="eyebrow">THE GRAND LEADERBOARD</p><h2>GOLDEN SCOREBOARD</h2><p>Every point brings your team closer to the treasure.</p></div>
-      <div id="leaderboard" class="leaderboard"></div>
-      <div class="history-panel">
-        <div class="panel-heading"><h3>✦ SCORE HISTORY</h3><button class="glass-button small-button" data-action="export">EXPORT CSV</button></div>
-        <div class="table-scroll"><table id="history-table"><thead></thead><tbody></tbody></table></div>
-      </div>
-      <div class="screen-actions"><button class="glass-button" data-action="return-game">← RETURN TO GAME</button><button class="gold-button" data-action="home">MAIN MENU</button></div>
-    </section>
+<!-- PODIUM -->
+<section id="podium" class="screen">
+  <canvas id="fx"></canvas>
+  <h2 id="pTitle">Choose 3rd place</h2>
+  <div id="pChoices" class="row"></div>
+  <div id="stage"></div>
+  <div class="row pbtn">
+    <button class="btn small" id="btnPUndo">UNDO SELECTION</button>
+    <button class="btn small" id="btnPRestart">RESTART GAME</button>
+    <button class="btn small" id="btnPHome">RETURN TO MAIN MENU</button>
+  </div>
+</section>
 
-    <section id="settings-screen" class="screen">
-      <div class="section-heading"><p class="eyebrow">TEACHER CONTROL ROOM</p><h2>GAME SETTINGS</h2><p>Customise your teams, timing and game-show atmosphere.</p></div>
-      <div class="settings-grid">
-        <div class="settings-card"><h3>♛ TEAM NAMES</h3><div id="team-name-fields"></div></div>
-        <div class="settings-card"><h3>◷ GAME TIMING</h3>
-          <label>Question preview (seconds)<input id="preview-duration" type="number" min="3" max="60"></label>
-          <label>Answering time (seconds)<input id="answer-duration" type="number" min="5" max="120"></label>
-        </div>
-        <div class="settings-card"><h3>♫ ANSWERING MUSIC</h3>
-          <label class="file-label">Upload MP3<input id="music-upload" type="file" accept="audio/mpeg,audio/mp3,audio/*"></label>
-          <div class="music-controls"><button class="glass-button small-button" data-action="preview-music">▶ PREVIEW</button><button class="glass-button small-button" data-action="stop-music">■ STOP</button></div>
-          <label>Volume <output id="volume-value">65%</output><input id="music-volume" type="range" min="0" max="100" value="65"></label>
-          <label class="check-label"><input id="music-muted" type="checkbox"> Mute answering music</label>
-          <p id="music-status" class="muted-note">No custom track selected. Built-in silence will be used.</p>
-        </div>
-        <div class="settings-card"><h3>✧ BACKGROUND ART</h3>
-          <label class="file-label">Upload mall background<input id="background-upload" type="file" accept="image/*"></label>
-          <button class="glass-button small-button" data-action="clear-background">USE DEFAULT BACKGROUND</button>
-          <p class="muted-note">Use a wide 16:9 image for the best projector result.</p>
-        </div>
-        <div class="settings-card wide-card"><h3>✎ EDIT QUESTIONS</h3><p class="muted-note">Edit the question bank in <code>questions.js</code> before uploading to GitHub Pages. Your browser reload will use those questions.</p><div class="settings-note">Each question needs one prompt, four colour-keyed options, and a correctAnswer colour: blue, yellow, green or red.</div></div>
-      </div>
-      <div class="screen-actions"><button class="glass-button" data-action="home">← RETURN TO HOME</button><button class="gold-button" data-action="save-settings">SAVE SETTINGS</button></div>
-    </section>
-
-    <section id="podium-screen" class="screen">
-      <div class="section-heading podium-intro"><p class="eyebrow">THE GRAND AWARD CEREMONY</p><h2>THE GOLDEN PODIUM</h2><p id="podium-instruction">Choose the team taking third place.</p></div>
-      <div id="podium-stage" class="podium-stage">
-        <div class="podium-spotlight"></div>
-        <div class="podium-place place-third"><div class="podium-team" id="podium-third">3RD PLACE</div><div class="podium-block"><b>3</b></div></div>
-        <div class="podium-place place-first"><div class="podium-team" id="podium-first">1ST PLACE</div><div class="podium-block"><b>1</b></div></div>
-        <div class="podium-place place-second"><div class="podium-team" id="podium-second">2ND PLACE</div><div class="podium-block"><b>2</b></div></div>
-      </div>
-      <div id="podium-choices" class="podium-choices"></div>
-      <div class="podium-undo-row"><button class="glass-button small-button" data-action="undo-podium">↶ UNDO PODIUM PICK</button></div>
-      <div id="champion-banner" class="champion-banner hidden"><div class="champion-crown">♛</div><p>THE CHAMPIONS</p><h2 id="champion-name"></h2><div class="celebration">✦ ✧ ✦ ✧ ✦</div></div>
-      <div class="screen-actions"><button class="glass-button" data-action="restart-game">↻ RESTART GAME</button><button class="gold-button" data-action="home">RETURN TO MAIN MENU</button></div>
-    </section>
-  </main>
-
-  <audio id="answer-audio" preload="auto"></audio>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="questions.js"></script>
-  <script src="app.js"></script>
+<!-- TEACHER BAR -->
+<div id="bar">
+  <button id="bPrev">◀ PREVIOUS</button>
+  <button id="bPause">PAUSE TIMER</button>
+  <button id="bSkip">SKIP TO ANSWER REVEAL</button>
+  <button id="bRestart">RESTART QUESTION</button>
+  <button id="bUndo">UNDO LAST ACTION</button>
+  <button id="bScore">SHOW SCOREBOARD</button>
+  <button id="bFs">FULL-SCREEN</button>
+  <button id="bHome">HOME</button>
+  <button id="bNext" class="gold">NEXT QUESTION ▶</button>
+</div>
+<div id="toast"></div>
+<script src="questions.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
