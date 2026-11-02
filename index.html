@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Race to Riches – English Camp</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -29,20 +31,10 @@
   <div class="panel">
     <h2>Settings</h2>
     <div class="grid2">
-      <label>Team 1 <input id="sName0"></label><label>Team 2 <input id="sName1"></label>
-      <label>Team 3 <input id="sName2"></label><label>Team 4 <input id="sName3"></label>
-      <label>Question preview (seconds) <input id="sPre" type="number" min="3" max="120"></label>
-      <label>Answering time (seconds) <input id="sAns" type="number" min="5" max="300"></label>
-      <label>Answering music (MP3) <input id="sMusic" type="file" accept="audio/*"></label>
-      <label>Music volume <input id="sVol" type="range" min="0" max="1" step="0.05"></label>
-      <label><input id="sMute" type="checkbox"> Mute music</label>
-      <label><input id="sFs" type="checkbox"> Go full-screen when game starts</label>
-      <label>Homepage background image <input id="sBg" type="file" accept="image/*"></label>
-      <label>&nbsp;<button class="btn small" id="btnBgClear">Remove uploaded background</button></label>
+      <label>Team 1 <input id="sName0" maxlength="20"></label><label>Team 2 <input id="sName1" maxlength="20"></label>
+      <label>Team 3 <input id="sName2" maxlength="20"></label><label>Team 4 <input id="sName3" maxlength="20"></label>
     </div>
     <div class="row">
-      <button class="btn small" id="btnMusicTest">Preview music</button>
-      <button class="btn small" id="btnMusicStop">Stop preview</button>
       <button class="btn small" id="btnSave">SAVE SETTINGS</button>
       <button class="btn small" id="btnSettingsHome">RETURN TO HOME</button>
     </div>
