@@ -17,11 +17,26 @@ const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch
 const total = t => S.hist.reduce((a, h) => a + h[t], 0) + S.adj[t];
 let phase = 'preview', tm = null, timerId = null, undoStack = [], prevScreen = 'home';
 
+/* ---------- Responsive fitting ---------- */
+function setVh() { document.documentElement.style.setProperty('--vh', (window.visualViewport ? visualViewport.height : innerHeight) * 0.01 + 'px'); }
+function setBar() { document.documentElement.style.setProperty('--bar', document.body.classList.contains('ingame') ? $('#bar').offsetHeight + 'px' : '0px'); }
+function fitQ() { // shrink very long questions until they fit the box during the big preview
+  const q = $('#qbox'); q.style.fontSize = '';
+  if (phase !== 'preview' || !$('#game').classList.contains('active')) return;
+  let fs = parseFloat(getComputedStyle(q).fontSize), n = 0;
+  while (q.scrollHeight > q.clientHeight + 2 && fs > 14 && n++ < 60) { fs *= 0.93; q.style.fontSize = fs + 'px'; }
+}
+function refit() { setVh(); setBar(); fitQ(); }
+setVh(); window.addEventListener('resize', refit); window.addEventListener('orientationchange', () => setTimeout(refit, 250));
+if (window.visualViewport) visualViewport.addEventListener('resize', refit);
+if (window.ResizeObserver) new ResizeObserver(() => { setBar(); }).observe($('#bar'));
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
+
 /* ---------- Helpers ---------- */
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.id); toast.id = setTimeout(() => t.classList.remove('show'), 1800); }
 function show(id) {
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === id));
-  document.body.classList.toggle('ingame', id === 'game');
+  document.body.classList.toggle('ingame', id === 'game'); setBar();
   $('#mall').classList.toggle('dim', id !== 'home');
   $('#mall').classList.toggle('art', id === 'home' && !!artUrl);
   if (id !== 'podium') stopFx();
@@ -42,8 +57,6 @@ function setArt(url) { artUrl = url; $('#mall').style.setProperty('--art', url ?
 })();
 (function decor() {
   const c = $('#coins'); let h = '';
-  for (let i = 0; i < 9; i++) { const s = 34 + Math.random() * 46;
-    h += `<div class="coin" style="width:${s}px;height:${s}px;left:${5 + Math.random() * 90}%;top:${8 + Math.random() * 80}%;animation-duration:${1.5 + Math.random() * 3}s,${5 + Math.random() * 5}s;opacity:${.55 + Math.random() * .4}">$</div>`; }
   for (let i = 0; i < 6; i++) h += `<div class="gem" style="left:${Math.random() * 95}%;top:${Math.random() * 85}%;font-size:${22 + Math.random() * 26}px;animation-delay:${-Math.random() * 6}s">${['💎', '👑', '✨', '💍', '⌚'][i % 5]}</div>`;
   c.innerHTML = h;
 })();
@@ -63,7 +76,7 @@ function unlockAudio() { // called from a click so browsers allow later playback
 function stopTimer() { clearInterval(timerId); timerId = null; tm = null; }
 function startPhase(name, secs) {
   stopTimer(); phase = name; tm = { name, endAt: performance.now() + secs * 1000, rem: secs * 1000, paused: false };
-  $('#game').className = 'screen active p-' + name; $('#bPause').textContent = 'PAUSE TIMER';
+  $('#game').className = 'screen active p-' + name; setBar(); fitQ(); $('#bPause').textContent = 'PAUSE TIMER';
   setTimerText(secs); if (name === 'answer') playMusic(true); else stopMusic();
   timerId = setInterval(tick, 100); updateBar();
 }
@@ -90,7 +103,7 @@ function beginQuestion(i) {
   $('#scorepanel').innerHTML = ''; shown = []; startPhase('preview', S.pre);
 }
 function reveal() {
-  stopTimer(); stopMusic(); phase = 'reveal'; $('#game').className = 'screen active p-reveal';
+  stopTimer(); stopMusic(); phase = 'reveal'; $('#game').className = 'screen active p-reveal'; fitQ();
   const c = questions[S.q].correctAnswer;
   $$('.ans').forEach(a => { a.classList.toggle('win', a.dataset.c === c); a.classList.toggle('dim', a.dataset.c !== c); });
   $('#banner').textContent = `CORRECT ANSWER! ${c.toUpperCase()} – ${questions[S.q].options[c]}`;
