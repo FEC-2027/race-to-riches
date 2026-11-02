@@ -181,30 +181,33 @@ function readFile(f, cb) { const r = new FileReader(); r.onload = () => cb(r.res
 
 /* ---------- Podium ---------- */
 const RANKS = ['3rd', '2nd', '1st'], SLOT = ['p3', 'p2', 'p1'];
-let fx = null, fxRaf = 0, fxTimer = 0, lastAdded = -1;
+let podMode = 'auto', fx = null, fxRaf = 0, fxTimer = 0, lastAdded = -1;
 function openPodium() { stopTimer(); stopMusic(); S.podium = []; lastAdded = -1; save(); show('podium'); renderPodium(); }
 function renderPodium() {
   const p = S.podium, done = p.length === 3;
-  $('#pTitle').textContent = done ? 'CHAMPION!' : `Choose the ${RANKS[p.length]} place team`;
-  $('#pChoices').innerHTML = done ? '' : [0, 1, 2, 3].filter(t => !p.includes(t)).map(t => `<button class="btn" data-t="${t}">${esc(S.names[t])}</button>`).join('');
-  $$('#pChoices button').forEach(b => b.onclick = () => { S.podium.push(+b.dataset.t); lastAdded = S.podium.length - 1; save(); renderPodium(); });
+  const auto = podMode === 'auto', order = [0, 1, 2, 3].sort((x, y) => total(y) - total(x)), seq = [order[2], order[1], order[0]]; // 3rd, 2nd, 1st by score
+  $('#btnPMode').textContent = auto ? 'SWITCH TO MANUAL PICK' : 'SWITCH TO AUTO (BY SCORE)';
+  $('#pTitle').textContent = done ? 'CHAMPION!' : auto ? 'And the podium is…' : `Choose the ${RANKS[p.length]} place team`;
+  $('#pChoices').innerHTML = done ? '' : auto ? `<button class="btn start" data-t="${seq[p.length]}">REVEAL ${RANKS[p.length].toUpperCase()} PLACE</button>`
+    : [0, 1, 2, 3].filter(t => !p.includes(t)).map(t => `<button class="btn" data-t="${t}">${esc(S.names[t])}</button>`).join('');
+  $$('#pChoices button').forEach(b => b.onclick = () => { if (S.podium.includes(+b.dataset.t)) return; S.podium.push(+b.dataset.t); lastAdded = S.podium.length - 1; save(); renderPodium(); });
   // DOM order: 3rd (left), 1st (centre), 2nd (right)
   $('#stage').innerHTML = [0, 2, 1].map(i => {
     const t = p[i], first = i === 2, cls = i === lastAdded ? '' : 'style="animation:none"';
     const card = t === undefined ? '' : `<div class="pcard ${first ? 'first' : ''}" ${cls}>${first ? '<span class="crown">👑</span>' : ''}${esc(S.names[t])}${first ? '<span class="champ">CHAMPION!</span>' : ''}</div>`;
     return `<div class="plat ${SLOT[i]}">${card}<span>${3 - i}</span></div>`;
   }).join('');
-  stopFx(); if (p.length === 3) celebrate();
+  stopFx(); if (p.length > 0 && p.length === lastAdded + 1) celebrate(p.length === 3 ? 2 : 1);
 }
 function undoPodium() { if (!S.podium.length) return; S.podium.pop(); lastAdded = -1; save(); renderPodium(); }
 function stopFx() { cancelAnimationFrame(fxRaf); clearInterval(fxTimer); fxRaf = fxTimer = 0; fx = null; const c = $('#fx'); if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height); $$('.spot').forEach(e => e.remove()); }
-function celebrate() { // confetti, coin rain, fireworks-style bursts after the winner lands
+function celebrate(level) { // confetti, coin rain, fireworks-style bursts after the winner lands
   const c = $('#fx'); c.width = innerWidth; c.height = innerHeight; const g = c.getContext('2d'); const P = []; fx = true;
-  ['10%', '60%'].forEach(l => { const s = document.createElement('div'); s.className = 'spot'; s.style.left = l; $('#podium').appendChild(s); });
+  if (level === 2) ['10%', '60%'].forEach(l => { const s = document.createElement('div'); s.className = 'spot'; s.style.left = l; $('#podium').appendChild(s); });
   const burst = (x, y, n, col) => { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, v = 2 + Math.random() * 7; P.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: .12, life: 90, col, r: 3 }); } };
   const rain = n => { for (let i = 0; i < n; i++) P.push({ x: Math.random() * c.width, y: -20, vx: (Math.random() - .5) * 2, vy: 2 + Math.random() * 4, g: .03, life: 400, col: Math.random() < .5 ? '#ffd54a' : ['#ff4d6d', '#4da3ff', '#5be37d', '#fff'][i % 4], r: 4 + Math.random() * 6, coin: Math.random() < .4 }); };
-  setTimeout(() => { if (!fx) return; rain(150); burst(c.width / 2, c.height * .3, 160, '#ffd54a'); }, 2200);
-  fxTimer = setInterval(() => { rain(8); if (Math.random() < .6) burst(Math.random() * c.width, Math.random() * c.height * .5, 50, ['#ffd54a', '#ff6b6b', '#7be0ff', '#fff'][Math.floor(Math.random() * 4)]); }, 700);
+  setTimeout(() => { if (!fx) return; if (level === 2) { rain(150); burst(c.width / 2, c.height * .3, 160, '#ffd54a'); } else { rain(90); burst(c.width / 2, c.height * .4, 70, '#ffd54a'); } }, level === 2 ? 2200 : 1300);
+  if (level === 2) fxTimer = setInterval(() => { rain(8); if (Math.random() < .6) burst(Math.random() * c.width, Math.random() * c.height * .5, 50, ['#ffd54a', '#ff6b6b', '#7be0ff', '#fff'][Math.floor(Math.random() * 4)]); }, 700);
   (function loop() {
     g.clearRect(0, 0, c.width, c.height);
     for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life--; if (p.life <= 0 || p.y > c.height + 30) { P.splice(i, 1); continue; }
@@ -234,6 +237,8 @@ $('#bNext').onclick = next; $('#bPrev').onclick = prev; $('#bRestart').onclick =
 $('#bUndo').onclick = undo; $('#bScore').onclick = () => { prevScreen = 'game'; openScore(); };
 $('#bFs').onclick = () => toggleFs(); $('#bHome').onclick = goHome;
 $('#btnPUndo').onclick = undoPodium;
+$('#btnPMode').onclick = () => { podMode = podMode === 'auto' ? 'manual' : 'auto'; S.podium = []; lastAdded = -1; renderPodium(); };
+$('#bEnd').onclick = () => { if (confirm('End the quiz now and go to the final podium?')) openPodium(); };
 $('#btnPRestart').onclick = () => { if (confirm('Erase all scores and restart the game?')) { resetGame(); beginQuestion(0); } };
 $('#btnPHome').onclick = goHome;
 document.addEventListener('visibilitychange', () => { if (document.hidden && tm && !tm.paused) togglePause(); });
