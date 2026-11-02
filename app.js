@@ -42,6 +42,7 @@ function show(id) {
   $('#mall').classList.toggle('dim', id !== 'home');
   $('#mall').classList.toggle('art', id === 'home' && !!artUrl);
   if (id !== 'podium') { stopFx(); clearTimeout(podTimer); stopSfx(['applause']); }
+  if (id === 'game') stopBg(); else if (id !== 'score') playBg(); // music on home / settings / podium, silent during questions
   prevScreen = id === 'score' ? prevScreen : id;
 }
 function animNum(el, to) {
@@ -70,7 +71,7 @@ function pickTrack() { // shuffled "bag" so every track plays once before any re
 function stopMusic() { tracks.forEach(t => { t.pause(); try { t.currentTime = 0; } catch (e) {} }); }
 function playMusic() { stopMusic(); cur = pickTrack(); if (!cur) return; const p = cur.play(); if (p) p.catch(() => toast('Music could not play – check the audio files in assets/')); }
 function unlockAudio() { // called from the START click so iPad/Chrome allow playback later
-  [...tracks, ...Object.values(sfx)].forEach(t => { t.muted = true; const p = t.play(); const done = () => { t.pause(); try { t.currentTime = 0; } catch (e) {} t.muted = false; }; p ? p.then(done).catch(done) : done(); });
+  [...tracks, ...Object.values(sfx), bg].forEach(t => { t.muted = true; const p = t.play(); const done = () => { t.pause(); try { t.currentTime = 0; } catch (e) {} t.muted = false; }; p ? p.then(done).catch(done) : done(); });
 }
 
 /* ---------- Sound effects: gong (answer reveal), points (+ buttons), applause (podium) ---------- */
@@ -82,6 +83,16 @@ function playSfx(name) { // restarts from the beginning each time, so fast repea
   try { a.pause(); a.currentTime = 0; } catch (e) {}
   const p = a.play(); if (p) p.catch(() => {});
 }
+/* ---------- Background music: homepage + podium (its own audio element, never touched by the countdown tracks or sound effects) ---------- */
+const bgCfg = Object.assign({ file: 'assets/music7.mp3', volume: 0.5 }, typeof homeMusic !== 'undefined' ? homeMusic : {});
+const bg = new Audio(bgCfg.file); bg.loop = true; bg.preload = 'auto'; bg.volume = bgCfg.volume;
+let bgWant = false;
+function playBg() { bgWant = true; if (S.mute || !bg.paused) return; const p = bg.play(); if (p) p.catch(() => {}); } // already playing => keeps going, no restart
+function stopBg() { bgWant = false; bg.pause(); try { bg.currentTime = 0; } catch (e) {} }
+// Browsers block autoplay on a fresh page, so start the music on the first click/key press (but not on the START click itself)
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, e => {
+  if (bgWant && bg.paused && !S.mute && !(e.target.closest && e.target.closest('#btnStart'))) { const p = bg.play(); if (p) p.catch(() => {}); }
+}));
 function stopSfx(names) { (names || Object.keys(sfx)).forEach(k => { const a = sfx[k]; if (a) { a.pause(); try { a.currentTime = 0; } catch (e) {} } }); }
 
 /* ---------- Timer (elapsed-time based, single instance) ---------- */
