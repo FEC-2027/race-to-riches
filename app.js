@@ -77,7 +77,7 @@ function unlockAudio() { // called from the START click so iPad/Chrome allow pla
 }
 
 /* ---------- Sound effects: gong (answer reveal), points (+ buttons), applause (podium) ---------- */
-const sfxFiles = Object.assign({ gong: 'assets/music4.mp3', points: 'assets/music5.mp3', applause: 'assets/music6.mp3' }, typeof soundFiles !== 'undefined' ? soundFiles : {});
+const sfxFiles = Object.assign({ gong: 'assets/kahoot-gong.mp3', points: 'assets/kahoot-point.mp3' }, typeof soundFiles !== 'undefined' ? soundFiles : {});
 const sfx = {};
 Object.keys(sfxFiles).forEach(k => { const a = new Audio(sfxFiles[k]); a.preload = 'auto'; a.volume = 1; sfx[k] = a; });
 function playSfx(name) { // restarts from the beginning each time, so fast repeated clicks still sound
