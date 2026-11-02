@@ -20,13 +20,14 @@ let phase = 'preview', tm = null, timerId = null, undoStack = [], prevScreen = '
 /* ---------- Responsive fitting ---------- */
 function setVh() { document.documentElement.style.setProperty('--vh', (window.visualViewport ? visualViewport.height : innerHeight) * 0.01 + 'px'); }
 function setBar() { document.documentElement.style.setProperty('--bar', document.body.classList.contains('ingame') ? $('#bar').offsetHeight + 'px' : '0px'); }
-function fitQ() { // shrink very long questions until they fit the box during the big preview
+function fitQ() { // preview: make the question as LARGE as possible while still fitting its box
   const q = $('#qbox'); q.style.fontSize = '';
   if (phase !== 'preview' || !$('#game').classList.contains('active')) return;
-  let fs = parseFloat(getComputedStyle(q).fontSize), n = 0;
-  while (q.scrollHeight > q.clientHeight + 2 && fs > 14 && n++ < 60) { fs *= 0.93; q.style.fontSize = fs + 'px'; }
+  const vh = (window.visualViewport ? visualViewport.height : innerHeight) / 100;
+  let fs = Math.min(innerWidth * 0.11, vh * 22), n = 0; q.style.fontSize = fs + 'px';
+  while (q.scrollHeight > q.clientHeight + 2 && fs > 18 && n++ < 80) { fs *= 0.95; q.style.fontSize = fs + 'px'; }
 }
-function refit() { setVh(); setBar(); fitQ(); }
+function refit() { setVh(); setBar(); fitQ(); requestAnimationFrame(fitQ); }
 setVh(); window.addEventListener('resize', refit); window.addEventListener('orientationchange', () => setTimeout(refit, 250));
 if (window.visualViewport) visualViewport.addEventListener('resize', refit);
 if (window.ResizeObserver) new ResizeObserver(() => { setBar(); }).observe($('#bar'));
@@ -39,7 +40,7 @@ function show(id) {
   document.body.classList.toggle('ingame', id === 'game'); setBar();
   $('#mall').classList.toggle('dim', id !== 'home');
   $('#mall').classList.toggle('art', id === 'home' && !!artUrl);
-  if (id !== 'podium') stopFx();
+  if (id !== 'podium') { stopFx(); clearTimeout(podTimer); }
   prevScreen = id === 'score' ? prevScreen : id;
 }
 function animNum(el, to) {
@@ -76,7 +77,7 @@ function unlockAudio() { // called from a click so browsers allow later playback
 function stopTimer() { clearInterval(timerId); timerId = null; tm = null; }
 function startPhase(name, secs) {
   stopTimer(); phase = name; tm = { name, endAt: performance.now() + secs * 1000, rem: secs * 1000, paused: false };
-  $('#game').className = 'screen active p-' + name; setBar(); fitQ(); $('#bPause').textContent = 'PAUSE TIMER';
+  $('#game').className = 'screen active p-' + name; setBar(); fitQ(); requestAnimationFrame(fitQ);
   setTimerText(secs); if (name === 'answer') playMusic(true); else stopMusic();
   timerId = setInterval(tick, 100); updateBar();
 }
@@ -90,8 +91,8 @@ function tick() {
 }
 function togglePause() {
   if (!tm) return;
-  if (!tm.paused) { tm.rem = Math.max(0, tm.endAt - performance.now()); tm.paused = true; music.pause(); $('#bPause').textContent = 'RESUME TIMER'; }
-  else { tm.endAt = performance.now() + tm.rem; tm.paused = false; if (tm.name === 'answer') playMusic(false); $('#bPause').textContent = 'PAUSE TIMER'; }
+  if (!tm.paused) { tm.rem = Math.max(0, tm.endAt - performance.now()); tm.paused = true; music.pause(); }
+  else { tm.endAt = performance.now() + tm.rem; tm.paused = false; if (tm.name === 'answer') playMusic(false); ; }
 }
 
 /* ---------- Question flow ---------- */
@@ -148,7 +149,7 @@ function prev() { if (S.q > 0) { beginQuestion(S.q - 1); toast('Previous questio
 function restartQuestion() {
   S.hist[S.q] = [0, 0, 0, 0]; S.seqs[S.q] = [{}, {}, {}, {}]; beginQuestion(S.q);
 }
-function updateBar() { $('#bNext').disabled = phase !== 'reveal'; $('#bPause').disabled = phase === 'reveal'; $('#bSkip').disabled = phase === 'reveal'; $('#bUndo').disabled = phase !== 'reveal'; $('#bNext').textContent = S.q >= N - 1 ? 'FINAL PODIUM ▶' : 'NEXT QUESTION ▶'; }
+function updateBar() { $('#bNext').disabled = phase !== 'reveal'; $('#bSkip').disabled = phase === 'reveal'; $('#bNext').textContent = S.q >= N - 1 ? 'FINAL PODIUM ▶' : 'NEXT QUESTION ▶'; }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* ---------- Start / navigation ---------- */
@@ -160,7 +161,7 @@ function startGame() {
   beginQuestion(S.q);
 }
 function resetGame() { stopTimer(); stopMusic(); const keep = { names: S.names, pre: S.pre, ans: S.ans, vol: S.vol, mute: S.mute, fs: S.fs }; S = Object.assign(fresh(), keep); S.started = true; undoStack = []; save(); }
-function goHome() { stopTimer(); stopMusic(); show('home'); }
+function goHome() { clearTimeout(podTimer); stopTimer(); stopMusic(); show('home'); }
 function toggleFs(force) {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {});
   else if (!force) document.exitFullscreen();
@@ -194,25 +195,29 @@ function readFile(f, cb) { const r = new FileReader(); r.onload = () => cb(r.res
 
 /* ---------- Podium ---------- */
 const RANKS = ['3rd', '2nd', '1st'], SLOT = ['p3', 'p2', 'p1'];
-let podMode = 'auto', fx = null, fxRaf = 0, fxTimer = 0, lastAdded = -1;
-function openPodium() { stopTimer(); stopMusic(); S.podium = []; lastAdded = -1; save(); show('podium'); renderPodium(); }
+let podMode = 'auto', autoRun = true, podTimer = 0, fx = null, fxRaf = 0, fxTimer = 0, lastAdded = -1;
+function openPodium() { stopTimer(); stopMusic(); podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; save(); show('podium'); renderPodium(); }
+function schedulePodium() { // Kahoot-style: 3rd, then 2nd, then 1st, with a pause for suspense
+  clearTimeout(podTimer); if (podMode !== 'auto' || !autoRun || S.podium.length >= 3) return;
+  const n = S.podium.length; podTimer = setTimeout(() => { if (!$('#podium').classList.contains('active')) return; const o = [0, 1, 2, 3].sort((x, y) => total(y) - total(x)); S.podium.push([o[2], o[1], o[0]][n]); lastAdded = n; save(); renderPodium(); }, n === 0 ? 1500 : n === 1 ? 3500 : 4500);
+}
 function renderPodium() {
   const p = S.podium, done = p.length === 3;
   const auto = podMode === 'auto', order = [0, 1, 2, 3].sort((x, y) => total(y) - total(x)), seq = [order[2], order[1], order[0]]; // 3rd, 2nd, 1st by score
   $('#btnPMode').textContent = auto ? 'SWITCH TO MANUAL PICK' : 'SWITCH TO AUTO (BY SCORE)';
-  $('#pTitle').textContent = done ? 'CHAMPION!' : auto ? 'And the podium is…' : `Choose the ${RANKS[p.length]} place team`;
-  $('#pChoices').innerHTML = done ? '' : auto ? `<button class="btn start" data-t="${seq[p.length]}">REVEAL ${RANKS[p.length].toUpperCase()} PLACE</button>`
+  $('#pTitle').textContent = done ? 'CHAMPION!' : auto && autoRun ? 'FINAL PODIUM – drum roll…' : auto ? 'FINAL PODIUM' : `Choose the ${RANKS[p.length]} place team`;
+  $('#pChoices').innerHTML = done || (auto && autoRun) ? '' : auto ? `<button class="btn start" data-t="${seq[p.length]}">REVEAL ${RANKS[p.length].toUpperCase()} PLACE</button>`
     : [0, 1, 2, 3].filter(t => !p.includes(t)).map(t => `<button class="btn" data-t="${t}">${esc(S.names[t])}</button>`).join('');
   $$('#pChoices button').forEach(b => b.onclick = () => { if (S.podium.includes(+b.dataset.t)) return; S.podium.push(+b.dataset.t); lastAdded = S.podium.length - 1; save(); renderPodium(); });
   // DOM order: 3rd (left), 1st (centre), 2nd (right)
   $('#stage').innerHTML = [0, 2, 1].map(i => {
     const t = p[i], first = i === 2, cls = i === lastAdded ? '' : 'style="animation:none"';
-    const card = t === undefined ? '' : `<div class="pcard ${first ? 'first' : ''}" ${cls}>${first ? '<span class="crown">👑</span>' : ''}${esc(S.names[t])}${first ? '<span class="champ">CHAMPION!</span>' : ''}</div>`;
+    const card = t === undefined ? '' : `<div class="pcard ${first ? 'first' : ''}" ${cls}>${first ? '<span class="crown">👑</span>' : ''}${esc(S.names[t])}<span class="pts">${total(t)} pts</span>${first ? '<span class="champ">CHAMPION!</span>' : ''}</div>`;
     return `<div class="plat ${SLOT[i]}">${card}<span>${3 - i}</span></div>`;
   }).join('');
-  stopFx(); if (p.length > 0 && p.length === lastAdded + 1) celebrate(p.length === 3 ? 2 : 1);
+  stopFx(); schedulePodium(); if (p.length > 0 && p.length === lastAdded + 1) celebrate(p.length === 3 ? 2 : 1);
 }
-function undoPodium() { if (!S.podium.length) return; S.podium.pop(); lastAdded = -1; save(); renderPodium(); }
+function undoPodium() { clearTimeout(podTimer); autoRun = false; if (!S.podium.length) return renderPodium(); S.podium.pop(); lastAdded = -1; save(); renderPodium(); }
 function stopFx() { cancelAnimationFrame(fxRaf); clearInterval(fxTimer); fxRaf = fxTimer = 0; fx = null; const c = $('#fx'); if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height); $$('.spot').forEach(e => e.remove()); }
 function celebrate(level) { // confetti, coin rain, fireworks-style bursts after the winner lands
   const c = $('#fx'); c.width = innerWidth; c.height = innerHeight; const g = c.getContext('2d'); const P = []; fx = true;
@@ -244,17 +249,20 @@ $('#sMute').onchange = e => { S.mute = e.target.checked; applyVol(); };
 $('#sMusic').onchange = e => { const f = e.target.files[0]; if (!f) return; music.src = URL.createObjectURL(f); readFile(f, d => { try { localStorage.setItem(MKEY, d); } catch (x) { toast('Music too large to remember after reload'); } }); toast('Music replaced'); };
 $('#sBg').onchange = e => { const f = e.target.files[0]; if (!f) return; readFile(f, d => { try { localStorage.setItem(BGKEY, d); } catch (x) { toast('Image too large to save'); } setArt(d); toast('Background set'); }); };
 $('#btnBgClear').onclick = () => { localStorage.removeItem(BGKEY); setArt(null); toast('Background removed'); };
-$('#bPause').onclick = togglePause;
 $('#bSkip').onclick = () => { if (phase !== 'reveal') reveal(); };
-$('#bNext').onclick = next; $('#bPrev').onclick = prev; $('#bRestart').onclick = restartQuestion;
-$('#bUndo').onclick = undo; $('#bScore').onclick = () => { prevScreen = 'game'; openScore(); };
+$('#bNext').onclick = next; $('#bPrev').onclick = prev;
+
 $('#bFs').onclick = () => toggleFs(); $('#bHome').onclick = goHome;
 $('#btnPUndo').onclick = undoPodium;
-$('#btnPMode').onclick = () => { podMode = podMode === 'auto' ? 'manual' : 'auto'; S.podium = []; lastAdded = -1; renderPodium(); };
-$('#bEnd').onclick = () => { if (confirm('End the quiz now and go to the final podium?')) openPodium(); };
+$('#btnPReplay').onclick = () => { podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; renderPodium(); };
+$('#btnPMode').onclick = () => { clearTimeout(podTimer); podMode = podMode === 'auto' ? 'manual' : 'auto'; autoRun = podMode === 'auto'; S.podium = []; lastAdded = -1; renderPodium(); };
+let endArm = 0; // two-click confirm (browser pop-up dialogs can be blocked)
+$('#bEnd').onclick = () => {
+  const b = $('#bEnd'); if (endArm) { clearTimeout(endArm); endArm = 0; b.textContent = 'END GAME → PODIUM'; openPodium(); return; }
+  b.textContent = 'CLICK AGAIN TO CONFIRM'; endArm = setTimeout(() => { endArm = 0; b.textContent = 'END GAME → PODIUM'; }, 3500);
+};
 $('#btnPRestart').onclick = () => { if (confirm('Erase all scores and restart the game?')) { resetGame(); beginQuestion(0); } };
 $('#btnPHome').onclick = goHome;
-document.addEventListener('visibilitychange', () => { if (document.hidden && tm && !tm.paused) togglePause(); });
 window.addEventListener('resize', () => { const c = $('#fx'); if (fx) { c.width = innerWidth; c.height = innerHeight; } });
 show('home');
 })();
