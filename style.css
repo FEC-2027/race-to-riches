@@ -64,7 +64,7 @@ input[type=text],input:not([type]),input[type=number]{padding:.5em;border-radius
 @keyframes tick{50%{box-shadow:0 0 70px var(--red);filter:brightness(1.4)}}
 #qnum{font-size:clamp(14px,2vw,34px);letter-spacing:.3em;color:var(--gold);text-shadow:0 0 12px rgba(255,190,60,.6)}
 #qbox{font-family:var(--f);text-align:center;color:var(--ivory);background:rgba(6,9,22,.78);border:3px solid var(--gold);border-radius:24px;
- padding:calc(var(--vh)*2) 3vw;display:flex;align-items:center;justify-content:center;width:min(94vw,1700px);text-shadow:0 3px 12px #000;transition:all .7s cubic-bezier(.2,.8,.2,1);box-shadow:0 0 50px rgba(232,194,106,.25)}
+ padding:calc(var(--vh)*2) 3vw;display:flex;align-items:center;justify-content:center;width:min(94vw,1700px);text-shadow:0 3px 12px #000;transition:width .7s,padding .7s;box-shadow:0 0 50px rgba(232,194,106,.25)}
 .p-preview #qbox{flex:1;font-size:min(7.2vw,calc(var(--vh)*13));margin-bottom:calc(var(--vh)*24);animation:qin .9s cubic-bezier(.2,1.4,.4,1)}
 @keyframes qin{from{transform:scale(.3) rotateX(70deg);opacity:0}}
 .p-answer #qbox,.p-reveal #qbox{font-size:min(2.6vw,calc(var(--vh)*5));width:min(80vw,1500px);padding:calc(var(--vh)*1.2) 2vw}
@@ -162,3 +162,10 @@ td.tot{color:#ffe680}
  #bar button{font-size:10px;padding:calc(var(--vh)*.5) 1vw}
  .btn{padding:.4em 1.2em}.sub{margin:calc(var(--vh)*.5) 0 calc(var(--vh)*2)}
 }
+
+#toast{opacity:0;pointer-events:none}#toast.show{opacity:1}
+.pts{display:block;font-size:.55em;color:var(--gold)}
+
+#qbox{line-height:1.15}
+body.ingame #coins{display:none}
+#coins{display:none!important}
