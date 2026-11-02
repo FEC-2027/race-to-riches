@@ -25,9 +25,9 @@ const questions = [
 // RACE TO RICHES – answering (countdown) music. Put your 3 audio files in the assets folder and list them here.
 // One track is picked at random for each question (all 3 are used before any repeats).
 const musicFiles = [
-  "assets/music1.mp3",
-  "assets/music2.mp3",
-  "assets/music3.mp3"
+  "assets/kahoot-game1.mp3",
+  "assets/kahoot-game2.mp3",
+  "assets/kahoot-game3.mp3"
 ];
 
 // RACE TO RICHES – sound effects (put these files in the assets folder too).
@@ -36,7 +36,11 @@ const musicFiles = [
 //   applause : plays each time a team appears on the final podium
 // If a file is missing, that sound is simply skipped (the game keeps working).
 const soundFiles = {
-  gong: "assets/music4.mp3",
-  points: "assets/music5.mp3",
-  applause: "assets/music6.mp3"
+  gong: "assets/kahoot-gong",
+  points: "assets/kahoot-point.mp3",
+  applause: "assets/kahoot-cheer.mp3"
 };
+
+// RACE TO RICHES – background music for the HOMEPAGE and the FINAL PODIUM (loops; stops during questions).
+// volume: 0 (silent) to 1 (full). Keep it lower than the applause so the cheers can be heard over it.
+const homeMusic = { file: "assets/kahoot-lobby.mp3", volume: 0.5 };
