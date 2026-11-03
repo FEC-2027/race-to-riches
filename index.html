@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Race to Riches – English Camp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="mall" id="mall"></div>
+<div id="coins"></div>
+<div id="cash" aria-hidden="true"></div>
+
+<!-- HOME -->
+<section id="home" class="screen active">
+  <h1 class="title" aria-label="Race to Riches"><span class="w"><span class="l" data-t="R" style="--i:0">R</span><span class="l" data-t="A" style="--i:1">A</span><span class="l" data-t="C" style="--i:2">C</span><span class="l" data-t="E" style="--i:3">E</span></span><span class="w"><span class="l" data-t="T" style="--i:4">T</span><span class="l" data-t="O" style="--i:5">O</span></span><span class="w"><span class="l" data-t="R" style="--i:6">R</span><span class="l" data-t="I" style="--i:7">I</span><span class="l" data-t="C" style="--i:8">C</span><span class="l" data-t="H" style="--i:9">H</span><span class="l" data-t="E" style="--i:10">E</span><span class="l" data-t="S" style="--i:11">S</span></span></h1>
+  <div class="sub">Furano English Camp 2027</div>
+  <button class="btn start" id="btnStart">GET RICH 💰</button>
+  <div class="row">
+    <button class="btn" id="btnHomeSettings">The Riches</button>
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section id="settings" class="screen">
+  <div class="panel">
+    <h2>Settings</h2>
+    <div class="grid2">
+      <label>Team 1 <input id="sName0" maxlength="20"></label><label>Team 2 <input id="sName1" maxlength="20"></label>
+      <label>Team 3 <input id="sName2" maxlength="20"></label><label>Team 4 <input id="sName3" maxlength="20"></label>
+    </div>
+    <div class="row">
+      <button class="btn small" id="btnSave">SAVE SETTINGS</button>
+      <button class="btn small" id="btnSettingsHome">RETURN TO HOME</button>
+    </div>
+  </div>
+</section>
+
+<!-- GAME -->
+<section id="game" class="screen">
+  <div id="timer">10</div>
+  <div id="qnum">QUESTION 1 / 20</div>
+  <div id="qbox"></div>
+  <div id="answers">
+    <div class="ans blue" data-c="blue"><span class="sym">▲</span><span class="atext"></span></div>
+    <div class="ans yellow" data-c="yellow"><span class="sym">◆</span><span class="atext"></span></div>
+    <div class="ans green" data-c="green"><span class="sym">●</span><span class="atext"></span></div>
+    <div class="ans red" data-c="red"><span class="sym">■</span><span class="atext"></span></div>
+  </div>
+  <div id="banner">CORRECT ANSWER!</div>
+  <div id="scorepanel"></div>
+</section>
+
+<!-- PODIUM -->
+<section id="podium" class="screen">
+  <canvas id="fx"></canvas>
+  <h2 id="pTitle">Choose 3rd place</h2>
+  <div id="pChoices" class="row"></div>
+  <div id="stage"></div>
+  <div class="row pbtn">
+    <button class="btn small" id="btnPReplay">REPLAY</button>
+    <button class="btn small" id="btnPMode">SWITCH TO MANUAL PICK</button>
+    <button class="btn small" id="btnPUndo">UNDO SELECTION</button>
+    <button class="btn small" id="btnPRestart">RESTART GAME</button>
+    <button class="btn small" id="btnPHome">RETURN TO MAIN MENU</button>
+  </div>
+</section>
+
+<!-- TEACHER BAR -->
+<div id="bar">
+  <button id="bPrev">◀ PREVIOUS</button>
+  <button id="bSkip">CHECK ANSWER</button>
+  <button id="bFs">FULL-SCREEN</button>
+  <button id="bHome">HOME</button>
+  <button id="bEnd">END THE GAME</button>
+  <button id="bNext" class="gold">NEXT QUESTION ▶</button>
+</div>
+<div id="toast"></div>
+<script src="questions.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
