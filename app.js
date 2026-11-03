@@ -249,19 +249,20 @@ function celebrate(level) { // confetti, coin rain, fireworks-style bursts after
   })();
 }
 
-/* ---------- Homepage money rain: notes and coins pour down fast BEHIND the title, then vanish off the bottom (nothing piles up) ---------- */
+/* ---------- Homepage coins: spinning retro golden coins drift down BEHIND the title, then vanish off the bottom (nothing piles up) ---------- */
 const cashEl = $('#cash'), reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 let cashTimer = 0, cashN = 0;
+const COIN = ['..XXXX..', '.XLLOOX.', 'XLOSSOOX', 'XLOSSOOX', 'XLOSSOOX', 'XLOSSOOX', 'XOOSSOOX', 'XOOOOOOX', '.XOOOOX.', '..XXXX..'], COIN_C = { X: '#8a3b00', O: '#ffcf1f', L: '#fff5a8', S: '#f08a00' };
+const COIN_SVG = '<svg viewBox="0 0 8 10" preserveAspectRatio="none" shape-rendering="crispEdges" aria-hidden="true">' + COIN.map((row, y) => [...row].map((c, x) => COIN_C[c] ? `<rect x="${x}" y="${y}" width="1" height="1" fill="${COIN_C[c]}"/>` : '').join('')).join('') + '</svg>';
 function spawnBill(delay) {
   if (cashN >= 16) return;
-  const W = innerWidth, H = innerHeight, r = Math.random, coin = r() < .35, el = document.createElement('div');
-  const w = coin ? Math.max(34, Math.min(70, W * (.035 + r() * .02))) : Math.max(70, Math.min(150, W * (.06 + r() * .05))), h = coin ? w : w * .5;
-  el.className = 'bill' + (coin ? ' coin' : ''); el.style.width = w + 'px'; el.style.height = h + 'px'; el.style.fontSize = h * (coin ? .6 : .62) + 'px';
-  el.innerHTML = '<b style="animation-duration:' + (1 + r() * 1.5).toFixed(2) + 's"><i>$</i></b>';
-  const sx = r() * (W + w) - w, sy = -h * 2 - r() * 40, ex = sx + (r() - .35) * W * .12, ey = H + h * 2;   // start above the top, fall off the bottom
-  const spin = (r() < .5 ? -1 : 1) * (200 + r() * 500), T = (x, y, a) => `translate(${x}px,${y}px) rotate(${a}deg)`;
+  const W = innerWidth, H = innerHeight, r = Math.random, el = document.createElement('div');
+  const w = Math.max(30, Math.min(58, W * (.03 + r() * .018))), h = w * 1.25;
+  el.className = 'bill'; el.style.width = w + 'px'; el.style.height = h + 'px'; el.innerHTML = COIN_SVG;
+  el.firstChild.style.animationDuration = (.6 + r() * .5).toFixed(2) + 's';
+  const sx = r() * (W - w), sy = -h * 2 - r() * 40, ex = sx + (r() - .5) * W * .08, ey = H + h * 2;   // start above the top, fall off the bottom
   cashEl.appendChild(el); cashN++;
-  el.animate([{ transform: T(sx, sy, 0), easing: 'cubic-bezier(.35,0,.9,.6)' }, { transform: T(ex, ey, spin) }],
+  el.animate([{ transform: `translate(${sx}px,${sy}px)`, easing: 'cubic-bezier(.35,0,.9,.6)' }, { transform: `translate(${ex}px,${ey}px)` }],
     { duration: 3800 + r() * 2200, delay: delay, fill: 'both' }).onfinish = () => { el.remove(); cashN = Math.max(0, cashN - 1); };
 }
 function startCash() { if (reduceMotion || cashTimer) return; for (let i = 0; i < 6; i++) spawnBill(i * 500); cashTimer = setInterval(() => spawnBill(0), 480); }
