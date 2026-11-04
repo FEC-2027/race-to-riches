@@ -208,4 +208,7 @@ input{font-size:max(16px,1.1em)!important}
 .plat.p4{height:0;background:none;box-shadow:none;border:0;border-radius:0}
 .plat.p4>span{display:none}
 .plat.p4 .pcard::before{content:"4";display:block;font-size:1.5em;line-height:1;color:#fff;text-shadow:2px 2px 0 #2a1204,-2px 2px 0 #2a1204,2px -2px 0 #2a1204,-2px -2px 0 #2a1204,0 3px 0 #2a1204}
-@media (max-aspect-ratio:1/1),(max-width:820px){.pcard.first{min-width:135%}.champ{letter-spacing:.08em}}
+@media (max-aspect-ratio:1/1),(max-width:820px){.champ{letter-spacing:.08em}}
+
+/* Podium cards: a single word is NEVER split. The card is as wide as its tower; the text size is shrunk by app.js until the longest word fits. Two-word names wrap only at the space. */
+.pcard{width:100%;min-width:0;overflow-wrap:normal;word-break:normal;hyphens:none}
