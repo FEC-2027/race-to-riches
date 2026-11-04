@@ -230,8 +230,14 @@ function renderPodium() {
     const card = t === undefined ? '' : `<div class="pcard ${first ? 'first' : ''}" ${cls}>${first ? '<span class="crown">👑</span>' : ''}${esc(S.names[t])}<span class="pts">${total(t)} pts</span>${first ? '<span class="champ">CHAMPION!</span>' : ''}</div>`;
     return `<div class="plat ${SLOT[i]}">${card}<span>${4 - i}</span></div>`;
   }).join('');
-  stopFx(); schedulePodium(); const added = p.length > 0 && p.length === lastAdded + 1;
+  fitPodCards(); stopFx(); schedulePodium(); const added = p.length > 0 && p.length === lastAdded + 1;
   if (added) { playSfx('applause'); celebrate(p.length === 4 ? 2 : 1); } else stopSfx(['applause']);
+}
+function fitPodCards() { // shrink each podium card's text until its longest word fits inside the tower width (words never split)
+  $$('#stage .pcard').forEach(c => {
+    c.style.fontSize = ''; let fs = parseFloat(getComputedStyle(c).fontSize), n = 0;
+    while (c.scrollWidth > c.clientWidth + 1 && fs > 8 && n++ < 80) { fs *= 0.94; c.style.fontSize = fs + 'px'; }
+  });
 }
 function undoPodium() { clearTimeout(podTimer); autoRun = false; if (!S.podium.length) return renderPodium(); S.podium.pop(); lastAdded = -1; save(); renderPodium(); }
 function stopFx() { cancelAnimationFrame(fxRaf); clearInterval(fxTimer); fxRaf = fxTimer = 0; fx = null; const c = $('#fx'); if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height); $$('.spot').forEach(e => e.remove()); }
@@ -289,6 +295,8 @@ $('#bEnd').onclick = () => {
 };
 $('#btnPRestart').onclick = () => { if (confirm('Erase all scores and restart the game?')) { resetGame(); beginQuestion(0); } };
 $('#btnPHome').onclick = goHome;
+window.addEventListener('resize', fitPodCards);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitPodCards);
 window.addEventListener('resize', () => { const c = $('#fx'); if (fx) { c.width = innerWidth; c.height = innerHeight; } });
 show('home');
 })();
