@@ -3,6 +3,7 @@
 'use strict';
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const KEY = 'rtr_state_v1';
+const practiceQ = typeof practiceQuestion !== 'undefined' ? practiceQuestion : null; // optional warm-up question, never scored
 const N = questions.length, COLORS = ['blue', 'yellow', 'green', 'red'], BTNS = [10, 30, 60, 100];
 
 /* ---------- State ---------- */
@@ -15,7 +16,7 @@ let S = fresh();
 try { const r = JSON.parse(localStorage.getItem(KEY)); if (r && r.hist && r.hist.length === N) S = Object.assign(fresh(), r); } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 const total = t => S.hist.reduce((a, h) => a + h[t], 0) ;
-let phase = 'preview', tm = null, timerId = null, undoStack = [];
+let practice = false, phase = 'preview', tm = null, timerId = null, undoStack = [];
 
 /* ---------- Responsive fitting ---------- */
 function setVh() { document.documentElement.style.setProperty('--vh', (window.visualViewport ? visualViewport.height : innerHeight) * 0.01 + 'px'); }
@@ -119,19 +120,20 @@ function tick() {
   if (n === 'preview') startPhase('answer', S.ans); else reveal();
 }
 /* ---------- Question flow ---------- */
-function beginQuestion(i) {
-  stopTimer(); stopMusic(); stopSfx(); S.q = i; undoStack = []; save(); show('game');
-  const q = questions[i];
-  $('#qnum').textContent = `QUESTION ${i + 1} / ${N}`; $('#qbox').textContent = q.question;
+function beginQuestion(i, isPractice) { // isPractice = the warm-up round: same screens, but no points and it does not touch the saved question number
+  stopTimer(); stopMusic(); stopSfx(); practice = !!(isPractice && practiceQ); if (!practice) { S.q = i; save(); } undoStack = []; show('game');
+  const q = practice ? practiceQ : questions[i];
+  $('#qnum').textContent = practice ? 'PRACTICE QUESTION' : `QUESTION ${i + 1} / ${N}`; $('#qbox').textContent = q.question;
   $$('.ans').forEach(a => { a.classList.remove('win', 'dim'); a.querySelector('.atext').textContent = q.options[a.dataset.c]; });
   $('#scorepanel').innerHTML = ''; shown = []; startPhase('preview', S.pre);
 }
 function reveal() {
   stopTimer(); stopMusic(); stopSfx(); playSfx('gong'); phase = 'reveal'; $('#game').className = 'screen active p-reveal'; fitQ();
-  const c = questions[S.q].correctAnswer;
+  const Q = practice ? practiceQ : questions[S.q], c = Q.correctAnswer;
   $$('.ans').forEach(a => { a.classList.toggle('win', a.dataset.c === c); a.classList.toggle('dim', a.dataset.c !== c); });
-  $('#banner').textContent = `CORRECT ANSWER! ${c.toUpperCase()} – ${questions[S.q].options[c]}`;
-  buildScore(); updateBar();
+  $('#banner').textContent = `CORRECT ANSWER! ${c.toUpperCase()} – ${Q.options[c]}`;
+  if (practice) $('#scorepanel').innerHTML = '<div class="pnote">PRACTICE ROUND &ndash; NO POINTS</div>'; else buildScore();
+  updateBar();
 }
 let shown = [];
 function buildScore() {
@@ -165,26 +167,27 @@ function undo() {
 }
 function next() {
   if (phase !== 'reveal') return;
+  if (practice) { beginQuestion(S.q); return; } // practice finished -> Question 1
   if (S.q >= N - 1) { openPodium(); return; }
   beginQuestion(S.q + 1);
 }
-function prev() { if (S.q > 0) { beginQuestion(S.q - 1); toast('Previous question – scores kept'); } }
+function prev() { if (practice) return; if (S.q > 0) { beginQuestion(S.q - 1); toast('Previous question – scores kept'); } }
 function restartQuestion() {
   S.hist[S.q] = [0, 0, 0, 0]; S.seqs[S.q] = [{}, {}, {}, {}]; beginQuestion(S.q);
 }
-function updateBar() { $('#bNext').disabled = phase !== 'reveal'; $('#bSkip').disabled = phase === 'reveal'; $('#bNext').textContent = S.q >= N - 1 ? 'FINAL PODIUM ▶' : 'NEXT QUESTION ▶'; }
+function updateBar() { $('#bNext').disabled = phase !== 'reveal'; $('#bSkip').disabled = phase === 'reveal'; $('#bNext').textContent = practice ? 'START QUESTION 1 ▶' : S.q >= N - 1 ? 'FINAL PODIUM ▶' : 'NEXT QUESTION ▶'; }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* ---------- Start / navigation ---------- */
 function startGame() {
   unlockAudio();
-  const hasProg = S.started && (S.q > 0 || S.hist.some(h => h.some(v => v)));
-  if (hasProg && !confirm('Continue the saved game?\nOK = continue, Cancel = start a new game')) { resetGame(); }
-  S.started = true; 
-  beginQuestion(S.q);
+  let hasProg = S.started && (S.q > 0 || S.hist.some(h => h.some(v => v)));
+  if (hasProg && !confirm('Continue the saved game?\nOK = continue, Cancel = start a new game')) { resetGame(); hasProg = false; }
+  S.started = true; save();
+  if (!hasProg && practiceQ) beginQuestion(0, true); else beginQuestion(S.q); // brand-new game -> practice question first
 }
-function resetGame() { stopTimer(); stopMusic(); stopSfx(); const keep = { names: S.names }; S = Object.assign(fresh(), keep); S.started = true; undoStack = []; save(); }
-function goHome() { clearTimeout(podTimer); stopTimer(); stopMusic(); stopSfx(); show('home'); }
+function resetGame() { practice = false; stopTimer(); stopMusic(); stopSfx(); const keep = { names: S.names }; S = Object.assign(fresh(), keep); S.started = true; undoStack = []; save(); }
+function goHome() { practice = false; clearTimeout(podTimer); stopTimer(); stopMusic(); stopSfx(); show('home'); }
 function toggleFs() {
   const d = document, el = d.documentElement, on = d.fullscreenElement || d.webkitFullscreenElement;
   try {
@@ -200,7 +203,7 @@ function saveSettings() { S.names = [0, 1, 2, 3].map(i => $('#sName' + i).value.
 /* ---------- Podium ---------- */
 const RANKS = ['4th', '3rd', '2nd', '1st'], SLOT = ['p4', 'p3', 'p2', 'p1'];
 let podMode = 'auto', autoRun = true, podTimer = 0, fx = null, fxRaf = 0, fxTimer = 0, lastAdded = -1, newFrom = -1;
-function openPodium() { stopTimer(); stopMusic(); stopSfx(); podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; save(); podStart = performance.now(); show('podium'); renderPodium(); }
+function openPodium() { practice = false; stopTimer(); stopMusic(); stopSfx(); podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; save(); podStart = performance.now(); show('podium'); renderPodium(); }
 let podStart = 0; // when the podium tune was started (fallback clock if the audio cannot play)
 const podCues = (typeof podiumCues !== 'undefined' && podiumCues.length === 3) ? podiumCues : [3, 7.5, 13.5]; // seconds into the podium tune: 3rd, 2nd, 1st appear
 function podClock() { return (!bgPod.paused && bgPod.currentTime > 0) ? bgPod.currentTime : (performance.now() - podStart) / 1000; }
@@ -298,7 +301,7 @@ $('#bEnd').onclick = () => {
   const b = $('#bEnd'); if (endArm) { clearTimeout(endArm); endArm = 0; b.textContent = 'END GAME → PODIUM'; openPodium(); return; }
   b.textContent = 'CLICK AGAIN TO CONFIRM'; endArm = setTimeout(() => { endArm = 0; b.textContent = 'END GAME → PODIUM'; }, 3500);
 };
-$('#btnPRestart').onclick = () => { if (confirm('Erase all scores and restart the game?')) { resetGame(); beginQuestion(0); } };
+$('#btnPRestart').onclick = () => { if (confirm('Erase all scores and restart the game?')) { resetGame(); beginQuestion(0, true); } };
 $('#btnPHome').onclick = goHome;
 window.addEventListener('resize', fitPodCards);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitPodCards);
