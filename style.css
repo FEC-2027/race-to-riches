@@ -239,3 +239,5 @@ input{font-size:max(16px,1.1em)!important}
 #home .sub .by{font-size:.62em;letter-spacing:.14em}
 #home .sub{text-shadow:1px 1px 0 #fff,-1px 1px 0 #fff,1px -1px 0 #fff,-1px -1px 0 #fff,0 0 6px rgba(255,255,255,.9)}
 @media (max-aspect-ratio:1/1),(max-width:820px){#home .sub{font-size:3.3vw;letter-spacing:.12em;right:4vw}}
+/* Practice round note (shown in the score area instead of the score buttons) */
+.pnote{grid-column:1/-1;align-self:center;text-align:center;font-size:max(18px,min(3.2vw,calc(var(--vh)*6)));letter-spacing:.06em;color:#fff;text-shadow:2px 2px 0 #0a1450,-2px 2px 0 #0a1450,2px -2px 0 #0a1450,-2px -2px 0 #0a1450,0 4px 0 #0a1450}
