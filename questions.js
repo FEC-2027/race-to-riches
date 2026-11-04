@@ -48,6 +48,6 @@ const homeMusic = { file: "assets/kahoot-lobby.mp3", volume: 1 };
 const podiumMusic = { file: "assets/kahoot-podium.mp3", volume: 1 };
 
 // RACE TO RICHES – podium timing (AUTO mode). Seconds into the podium music when each team starts to appear:
-//   [ 3rd place, 2nd place, 1st place (champion) ]
+//   [ 4th AND 3rd place together, 2nd place, 1st place (champion) ]
 // The card rises for about 2 seconds, so if you want it to LAND on a cheer, use a number about 2 seconds earlier.
 const podiumCues = [3, 7.5, 13.5];
