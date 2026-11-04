@@ -145,11 +145,11 @@ function buildScore() {
 function refreshScore(init) {
   for (let t = 0; t < 4; t++) {
     animNum($('#cur' + t), S.hist[S.q][t]); animNum($('#tot' + t), total(t));
-    BTNS.forEach(b => { const n = S.seqs[S.q][t][b] || 0; $(`#nx${t}_${b}`).textContent = n ? `next +${b * 2 ** n} (×${n})` : ''; });
+    BTNS.forEach(b => { const n = S.seqs[S.q][t][b] || 0; $(`#nx${t}_${b}`).textContent = n ? `×${n}` : ''; });
   }
 }
 function award(t, b) {
-  const seq = S.seqs[S.q][t], n = seq[b] || 0, pts = b * 2 ** n;
+  const seq = S.seqs[S.q][t], n = seq[b] || 0, pts = b; // every click adds the button's own value (no doubling)
   undoStack.push({ q: S.q, t, pts: S.hist[S.q][t], seq: { ...seq } });
   S.hist[S.q][t] += pts; seq[b] = n + 1; save(); refreshScore(); playSfx('points');
   const el = $('#team' + t); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); toast(`${S.names[t]}: +${pts}`);
