@@ -56,23 +56,3 @@ const podiumMusic = { file: "assets/kahoot-podium.mp3", volume: 1 };
 //   [ 4th AND 3rd place together, 2nd place, 1st place (champion) ]
 // The card rises for about 2 seconds, so if you want it to LAND on a cheer, use a number about 2 seconds earlier.
 const podiumCues = [3, 7.5, 13.5];
-//   gong     : plays when the correct answer is revealed (Kahoot-style gong)
-//   points   : plays every time you click a +10 / +30 / +60 / +100 button
-// (The podium music already contains the applause and cheers, so there is no separate applause file.)
-// If a file is missing, that sound is simply skipped (the game keeps working).
-const soundFiles = {
-  gong: "assets/kahoot-gong.mp3",
-  points: "assets/kahoot-point.mp3"
-};
-
-// RACE TO RICHES – background music (volume: 0 = silent ... 1 = full; 1 is the maximum; do NOT go above 1).
-//   homeMusic   : HOMEPAGE (and Settings) - loops until you start the game
-//   podiumMusic : FINAL PODIUM - starts automatically when the podium opens and plays ONCE (no repeat)
-// Both are silent during the questions.
-const homeMusic = { file: "assets/kahoot-lobby.mp3", volume: 1 };
-const podiumMusic = { file: "assets/kahoot-podium.mp3", volume: 1 };
-
-// RACE TO RICHES – podium timing (AUTO mode). Seconds into the podium music when each team starts to appear:
-//   [ 4th AND 3rd place together, 2nd place, 1st place (champion) ]
-// The card rises for about 2 seconds, so if you want it to LAND on a cheer, use a number about 2 seconds earlier.
-const podiumCues = [3, 7.5, 13.5];
