@@ -220,21 +220,26 @@ function renderPodium() {
   const p = S.podium, done = p.length === 4;
   const auto = podMode === 'auto', order = [0, 1, 2, 3].sort((x, y) => total(y) - total(x)), seq = [order[3], order[2], order[1], order[0]]; // 4th, 3rd, 2nd, 1st by score
   $('#btnPMode').textContent = auto ? 'SWITCH TO MANUAL PICK' : 'SWITCH TO AUTO (BY SCORE)';
-  $('#pTitle').textContent = done ? 'CHAMPION!' : auto && autoRun ? 'FINAL PODIUM – drum roll…' : auto ? 'FINAL PODIUM' : `Choose the ${RANKS[p.length]} place team`;
+  $('#pTitle').textContent = auto || done ? 'THE FINAL PODIUM' : `Choose the ${RANKS[p.length]} place team`;
   $('#pChoices').innerHTML = done || (auto && autoRun) ? '' : auto ? `<button class="btn start" data-t="${seq[p.length]}">REVEAL ${RANKS[p.length].toUpperCase()} PLACE</button>`
     : [0, 1, 2, 3].filter(t => !p.includes(t)).map(t => `<button class="btn" data-t="${t}">${esc(S.names[t])}</button>`).join('');
   $$('#pChoices button').forEach(b => b.onclick = () => { if (S.podium.includes(+b.dataset.t)) return; newFrom = S.podium.length; S.podium.push(+b.dataset.t); lastAdded = S.podium.length - 1; save(); renderPodium(); });
   // DOM order: 4th (ground, far left), 3rd, 1st (centre tower), 2nd
   $('#stage').innerHTML = [0, 1, 3, 2].map(i => {
     const t = p[i], first = i === 3, cls = (i >= newFrom && i <= lastAdded) ? '' : 'style="animation:none"';
-    const card = t === undefined ? '' : `<div class="pcard ${first ? 'first' : ''}" ${cls}>${first ? '<span class="crown">👑</span>' : ''}${esc(S.names[t])}<span class="pts">${total(t)} pts</span>${first ? '<span class="champ">CHAMPION!</span>' : ''}</div>`;
-    return `<div class="plat ${SLOT[i]}">${card}<span>${4 - i}</span></div>`;
+    const card = t === undefined ? '' : `<div class="pcard ${first ? 'first' : ''}" ${cls}>${first ? '<span class="crown">👑</span>' : ''}${esc(S.names[t])}<span class="pts">${total(t)} pts</span></div>`;
+    const tw = first && t !== undefined ? `<b class="tchamp" ${cls}>CHAMPION!</b>` : ''; // CHAMPION! is written on the brick tower itself
+    return `<div class="plat ${SLOT[i]}">${card}<span>${4 - i}</span>${tw}</div>`;
   }).join('');
   fitPodCards(); stopFx(); schedulePodium(); const added = p.length > 0 && p.length === lastAdded + 1;
   if (added) { playSfx('applause'); celebrate(p.length === 4 ? 2 : 1); } else stopSfx(['applause']);
 }
 function fitPodCards() { // shrink each podium card's text until its longest word fits inside the tower width (words never split)
   $$('#stage .pcard').forEach(c => {
+    c.style.fontSize = ''; let fs = parseFloat(getComputedStyle(c).fontSize), n = 0;
+    while (c.scrollWidth > c.clientWidth + 1 && fs > 8 && n++ < 80) { fs *= 0.94; c.style.fontSize = fs + 'px'; }
+  });
+  $$('#stage .tchamp').forEach(c => { // the word on the tower must fit the tower width too
     c.style.fontSize = ''; let fs = parseFloat(getComputedStyle(c).fontSize), n = 0;
     while (c.scrollWidth > c.clientWidth + 1 && fs > 8 && n++ < 80) { fs *= 0.94; c.style.fontSize = fs + 'px'; }
   });
