@@ -198,38 +198,40 @@ function openSettings() { S.names.forEach((n, i) => $('#sName' + i).value = n); 
 function saveSettings() { S.names = [0, 1, 2, 3].map(i => $('#sName' + i).value.trim() || 'TEAM ' + (i + 1)); save(); toast('Team names saved'); }
 
 /* ---------- Podium ---------- */
-const RANKS = ['3rd', '2nd', '1st'], SLOT = ['p3', 'p2', 'p1'];
-let podMode = 'auto', autoRun = true, podTimer = 0, fx = null, fxRaf = 0, fxTimer = 0, lastAdded = -1;
+const RANKS = ['4th', '3rd', '2nd', '1st'], SLOT = ['p4', 'p3', 'p2', 'p1'];
+let podMode = 'auto', autoRun = true, podTimer = 0, fx = null, fxRaf = 0, fxTimer = 0, lastAdded = -1, newFrom = -1;
 function openPodium() { stopTimer(); stopMusic(); stopSfx(); podMode = 'auto'; autoRun = true; S.podium = []; lastAdded = -1; save(); podStart = performance.now(); show('podium'); renderPodium(); }
 let podStart = 0; // when the podium tune was started (fallback clock if the audio cannot play)
 const podCues = (typeof podiumCues !== 'undefined' && podiumCues.length === 3) ? podiumCues : [3, 7.5, 13.5]; // seconds into the podium tune: 3rd, 2nd, 1st appear
 function podClock() { return (!bgPod.paused && bgPod.currentTime > 0) ? bgPod.currentTime : (performance.now() - podStart) / 1000; }
-function schedulePodium() { // each team appears exactly when the podium tune reaches its cue time
-  clearTimeout(podTimer); if (podMode !== 'auto' || !autoRun || S.podium.length >= 3) return;
-  const n = S.podium.length;
+function schedulePodium() { // 4th + 3rd appear TOGETHER at the first cue, then 2nd, then 1st - each when the podium tune reaches its cue time
+  clearTimeout(podTimer); if (podMode !== 'auto' || !autoRun || S.podium.length >= 4) return;
+  const n = S.podium.length ? S.podium.length - 1 : 0; // 0 = 4th & 3rd, 1 = 2nd, 2 = 1st
   podTimer = setInterval(() => {
     if (!$('#podium').classList.contains('active')) { clearInterval(podTimer); return; }
     if (podClock() < podCues[n]) return;
     clearInterval(podTimer);
-    const o = [0, 1, 2, 3].sort((x, y) => total(y) - total(x)); S.podium.push([o[2], o[1], o[0]][n]); lastAdded = n; save(); renderPodium();
+    const o = [0, 1, 2, 3].sort((x, y) => total(y) - total(x)); newFrom = S.podium.length;
+    if (n === 0) S.podium.push(o[3], o[2]); else if (n === 1) S.podium.push(o[1]); else S.podium.push(o[0]);
+    lastAdded = S.podium.length - 1; save(); renderPodium();
   }, 40);
 }
 function renderPodium() {
-  const p = S.podium, done = p.length === 3;
-  const auto = podMode === 'auto', order = [0, 1, 2, 3].sort((x, y) => total(y) - total(x)), seq = [order[2], order[1], order[0]]; // 3rd, 2nd, 1st by score
+  const p = S.podium, done = p.length === 4;
+  const auto = podMode === 'auto', order = [0, 1, 2, 3].sort((x, y) => total(y) - total(x)), seq = [order[3], order[2], order[1], order[0]]; // 4th, 3rd, 2nd, 1st by score
   $('#btnPMode').textContent = auto ? 'SWITCH TO MANUAL PICK' : 'SWITCH TO AUTO (BY SCORE)';
   $('#pTitle').textContent = done ? 'CHAMPION!' : auto && autoRun ? 'FINAL PODIUM – drum roll…' : auto ? 'FINAL PODIUM' : `Choose the ${RANKS[p.length]} place team`;
   $('#pChoices').innerHTML = done || (auto && autoRun) ? '' : auto ? `<button class="btn start" data-t="${seq[p.length]}">REVEAL ${RANKS[p.length].toUpperCase()} PLACE</button>`
     : [0, 1, 2, 3].filter(t => !p.includes(t)).map(t => `<button class="btn" data-t="${t}">${esc(S.names[t])}</button>`).join('');
-  $$('#pChoices button').forEach(b => b.onclick = () => { if (S.podium.includes(+b.dataset.t)) return; S.podium.push(+b.dataset.t); lastAdded = S.podium.length - 1; save(); renderPodium(); });
-  // DOM order: 3rd (left), 1st (centre), 2nd (right)
-  $('#stage').innerHTML = [0, 2, 1].map(i => {
-    const t = p[i], first = i === 2, cls = i === lastAdded ? '' : 'style="animation:none"';
+  $$('#pChoices button').forEach(b => b.onclick = () => { if (S.podium.includes(+b.dataset.t)) return; newFrom = S.podium.length; S.podium.push(+b.dataset.t); lastAdded = S.podium.length - 1; save(); renderPodium(); });
+  // DOM order: 4th (ground, far left), 3rd, 1st (centre tower), 2nd
+  $('#stage').innerHTML = [0, 1, 3, 2].map(i => {
+    const t = p[i], first = i === 3, cls = (i >= newFrom && i <= lastAdded) ? '' : 'style="animation:none"';
     const card = t === undefined ? '' : `<div class="pcard ${first ? 'first' : ''}" ${cls}>${first ? '<span class="crown">👑</span>' : ''}${esc(S.names[t])}<span class="pts">${total(t)} pts</span>${first ? '<span class="champ">CHAMPION!</span>' : ''}</div>`;
-    return `<div class="plat ${SLOT[i]}">${card}<span>${3 - i}</span></div>`;
+    return `<div class="plat ${SLOT[i]}">${card}<span>${4 - i}</span></div>`;
   }).join('');
   stopFx(); schedulePodium(); const added = p.length > 0 && p.length === lastAdded + 1;
-  if (added) { playSfx('applause'); celebrate(p.length === 3 ? 2 : 1); } else stopSfx(['applause']);
+  if (added) { playSfx('applause'); celebrate(p.length === 4 ? 2 : 1); } else stopSfx(['applause']);
 }
 function undoPodium() { clearTimeout(podTimer); autoRun = false; if (!S.podium.length) return renderPodium(); S.podium.pop(); lastAdded = -1; save(); renderPodium(); }
 function stopFx() { cancelAnimationFrame(fxRaf); clearInterval(fxTimer); fxRaf = fxTimer = 0; fx = null; const c = $('#fx'); if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height); $$('.spot').forEach(e => e.remove()); }
