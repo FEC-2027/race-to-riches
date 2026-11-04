@@ -50,7 +50,7 @@ button,input,table{font-family:var(--f)}
  55%{opacity:1;transform:translateY(.07em) rotateX(12deg) scale(1.18)}78%{transform:translateY(-.025em) rotateX(-5deg) scale(.97)}100%{opacity:1;transform:none}}
 @keyframes faceShine{0%{background-position:-160% 0,0 0}38%,100%{background-position:260% 0,0 0}}
 @media (prefers-reduced-motion:reduce){.title .l,.title .l::after{animation:none}}
-.sub{font-family:var(--f);font-size:min(3vw,calc(var(--vh)*5));letter-spacing:.7em;color:var(--gold);margin:calc(var(--vh)*1) 0 calc(var(--vh)*5);color:#ffe14d;text-shadow:2px 2px 0 #3a1c00,-2px 2px 0 #3a1c00,2px -2px 0 #3a1c00,-2px -2px 0 #3a1c00,0 4px 0 #3a1c00}
+.sub{font-family:var(--f);font-size:min(3vw,calc(var(--vh)*5));letter-spacing:.7em;color:var(--gold);margin:calc(var(--vh)*1) 0 calc(var(--vh)*5);color:#102070;text-shadow:2px 2px 0 #fff,-2px 2px 0 #fff,2px -2px 0 #fff,-2px -2px 0 #fff,0 3px 0 #fff}
 .btn{cursor:pointer;border:2px solid #fff0b0;border-radius:999px;padding:.8em 1.8em;font-size:clamp(14px,1.6vw,26px);color:#3a2504;
  background:linear-gradient(#fff2b0,#e8b93c 55%,#b27d1c);box-shadow:0 0 0 3px #4a2a00,0 6px 0 3px #4a2a00,0 12px 18px rgba(0,0,0,.35);margin:calc(var(--vh)*.6) .8vw;transition:transform .15s,filter .15s}
 .btn:hover{transform:translateY(-3px);filter:brightness(1.1)}
@@ -128,7 +128,7 @@ td.tot{color:#ffe680}
 #fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:6}
 #pTitle{font-size:min(3.6vw,calc(var(--vh)*6));color:#ffe14d;text-shadow:2px 2px 0 #3a1c00,-2px 2px 0 #3a1c00,2px -2px 0 #3a1c00,-2px -2px 0 #3a1c00,0 4px 0 #3a1c00}
 #stage{display:flex;align-items:flex-end;justify-content:center;gap:1.5vw;flex:1;width:min(1300px,96vw);padding-bottom:calc(var(--vh)*1)}
-.plat{position:relative;width:27%;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;border-radius:14px 14px 0 0;
+.plat{position:relative;width:22.5%;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;border-radius:14px 14px 0 0;
  background:linear-gradient(90deg,#8a5d10,#f7dd86 30%,#fff3b0 50%,#f0c24a 70%,#8a5d10);color:#3a2504;font-family:var(--f);font-size:min(5vw,calc(var(--vh)*9));box-shadow:0 0 40px rgba(255,200,70,.5)}
 .plat.p3{height:calc(var(--vh)*20)}.plat.p2{height:calc(var(--vh)*30)}.plat.p1{height:calc(var(--vh)*42)}
 .pcard{position:absolute;bottom:100%;margin-bottom:calc(var(--vh)*1);min-width:90%;text-align:center;padding:calc(var(--vh)*1.2) .8vw;border-radius:16px;font-size:min(2.4vw,calc(var(--vh)*4.4));color:var(--ivory);
@@ -168,7 +168,7 @@ td.tot{color:#ffe680}
  .grid2{grid-template-columns:1fr}
  #rank{grid-template-columns:1fr 1fr}
  .title{font-size:8.6vw;text-align:center}.sub{letter-spacing:.35em;font-size:4vw}
- .plat{width:30%;font-size:8vw}.pcard{font-size:max(13px,3.4vw)}.pcard.first{font-size:max(15px,4vw)}
+ .plat{width:23%;font-size:8vw}.pcard{font-size:max(13px,3.4vw)}.pcard.first{font-size:max(15px,4vw)}
  #stage{gap:1vw}
  #pTitle{font-size:max(20px,6vw)}
 }
@@ -203,3 +203,9 @@ input{font-size:max(16px,1.1em)!important}
 .plat.p1>span{margin-top:calc(var(--vh)*7);text-shadow:2px 2px 0 #2a1204,-2px 2px 0 #2a1204,2px -2px 0 #2a1204,-2px -2px 0 #2a1204,0 4px 0 #2a1204}
 .pcard{z-index:3}
 @media (prefers-reduced-motion:reduce){.plat.p1::after{animation:none}}
+
+/* 4th place stands on the GROUND (no tower): the team card sits directly on the ground line */
+.plat.p4{height:0;background:none;box-shadow:none;border:0;border-radius:0}
+.plat.p4>span{display:none}
+.plat.p4 .pcard::before{content:"4";display:block;font-size:1.5em;line-height:1;color:#fff;text-shadow:2px 2px 0 #2a1204,-2px 2px 0 #2a1204,2px -2px 0 #2a1204,-2px -2px 0 #2a1204,0 3px 0 #2a1204}
+@media (max-aspect-ratio:1/1),(max-width:820px){.pcard.first{min-width:135%}.champ{letter-spacing:.08em}}
