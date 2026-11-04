@@ -16,7 +16,8 @@ let S = fresh();
 try { const r = JSON.parse(localStorage.getItem(KEY)); if (r && r.hist && r.hist.length === N) S = Object.assign(fresh(), r); } catch (e) {}
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 const total = t => S.hist.reduce((a, h) => a + h[t], 0) ;
-let practice = false, phase = 'preview', tm = null, timerId = null, undoStack = [];
+const freshP = () => ({ hist: [0, 0, 0, 0], seqs: [{}, {}, {}, {}] }); // practice-round points: separate from the real scores, never saved
+let P = freshP(), practice = false, phase = 'preview', tm = null, timerId = null, undoStack = [];
 
 /* ---------- Responsive fitting ---------- */
 function setVh() { document.documentElement.style.setProperty('--vh', (window.visualViewport ? visualViewport.height : innerHeight) * 0.01 + 'px'); }
@@ -121,7 +122,7 @@ function tick() {
 }
 /* ---------- Question flow ---------- */
 function beginQuestion(i, isPractice) { // isPractice = the warm-up round: same screens, but no points and it does not touch the saved question number
-  stopTimer(); stopMusic(); stopSfx(); practice = !!(isPractice && practiceQ); if (!practice) { S.q = i; save(); } undoStack = []; show('game');
+  stopTimer(); stopMusic(); stopSfx(); practice = !!(isPractice && practiceQ); if (practice) P = freshP(); else { S.q = i; save(); } undoStack = []; show('game');
   const q = practice ? practiceQ : questions[i];
   $('#qnum').textContent = practice ? 'PRACTICE QUESTION' : `QUESTION ${i + 1} / ${N}`; $('#qbox').textContent = q.question;
   $$('.ans').forEach(a => { a.classList.remove('win', 'dim'); a.querySelector('.atext').textContent = q.options[a.dataset.c]; });
@@ -132,7 +133,7 @@ function reveal() {
   const Q = practice ? practiceQ : questions[S.q], c = Q.correctAnswer;
   $$('.ans').forEach(a => { a.classList.toggle('win', a.dataset.c === c); a.classList.toggle('dim', a.dataset.c !== c); });
   $('#banner').textContent = `CORRECT ANSWER! ${c.toUpperCase()} – ${Q.options[c]}`;
-  if (practice) $('#scorepanel').innerHTML = '<div class="pnote">PRACTICE ROUND &ndash; NO POINTS</div>'; else buildScore();
+  buildScore();
   updateBar();
 }
 let shown = [];
@@ -144,23 +145,25 @@ function buildScore() {
   $$('.sbtn').forEach(b => b.onclick = () => +b.dataset.b ? award(+b.dataset.t, +b.dataset.b) : zero(+b.dataset.t));
   refreshScore(true);
 }
+const rowH = () => practice ? P.hist : S.hist[S.q], rowS = () => practice ? P.seqs : S.seqs[S.q]; // the points row being edited: practice round or the real question
 function refreshScore(init) {
   for (let t = 0; t < 4; t++) {
-    animNum($('#cur' + t), S.hist[S.q][t]); animNum($('#tot' + t), total(t));
-    BTNS.forEach(b => { const n = S.seqs[S.q][t][b] || 0; $(`#nx${t}_${b}`).textContent = n ? `×${n}` : ''; });
+    animNum($('#cur' + t), rowH()[t]); animNum($('#tot' + t), practice ? rowH()[t] : total(t));
+    BTNS.forEach(b => { const n = rowS()[t][b] || 0; $(`#nx${t}_${b}`).textContent = n ? `×${n}` : ''; });
   }
 }
 function award(t, b) {
-  const seq = S.seqs[S.q][t], n = seq[b] || 0, pts = b; // every click adds the button's own value (no doubling)
-  undoStack.push({ q: S.q, t, pts: S.hist[S.q][t], seq: { ...seq } });
-  S.hist[S.q][t] += pts; seq[b] = n + 1; save(); refreshScore(); playSfx('points');
+  const seq = rowS()[t], n = seq[b] || 0, pts = b; // every click adds the button's own value (no doubling)
+  undoStack.push({ q: S.q, t, pts: rowH()[t], seq: { ...seq } });
+  rowH()[t] += pts; seq[b] = n + 1; if (!practice) save(); refreshScore(); playSfx('points');
   const el = $('#team' + t); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); toast(`${S.names[t]}: +${pts}`);
 }
 function zero(t) {
-  undoStack.push({ q: S.q, t, pts: S.hist[S.q][t], seq: { ...S.seqs[S.q][t] } });
-  S.hist[S.q][t] = 0; S.seqs[S.q][t] = {}; save(); refreshScore(); toast(`${S.names[t]}: question points reset`);
+  undoStack.push({ q: S.q, t, pts: rowH()[t], seq: { ...rowS()[t] } });
+  rowH()[t] = 0; rowS()[t] = {}; if (!practice) save(); refreshScore(); toast(`${S.names[t]}: question points reset`);
 }
 function undo() {
+  if (practice) return;
   const u = undoStack.pop(); if (!u || u.q !== S.q) return toast('Nothing to undo');
   S.hist[u.q][u.t] = u.pts; S.seqs[u.q][u.t] = u.seq; save();
   if (phase === 'reveal') refreshScore(); toast('Last action undone');
