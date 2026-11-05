@@ -230,8 +230,8 @@ function renderPodium() {
   $('#pChoices').innerHTML = done || (auto && autoRun) ? '' : auto ? `<button class="btn start" data-t="${seq[p.length]}">REVEAL ${RANKS[p.length].toUpperCase()} PLACE</button>`
     : [0, 1, 2, 3].filter(t => !p.includes(t)).map(t => `<button class="btn" data-t="${t}">${esc(S.names[t])}</button>`).join('');
   $$('#pChoices button').forEach(b => b.onclick = () => { if (S.podium.includes(+b.dataset.t)) return; newFrom = S.podium.length; S.podium.push(+b.dataset.t); lastAdded = S.podium.length - 1; save(); renderPodium(); });
-  // DOM order: 4th (ground, far left), 3rd, 1st (centre tower), 2nd
-  $('#stage').innerHTML = [0, 1, 3, 2].map(i => {
+  // DOM order (left to right): 4th (lowest), 3rd, 2nd, 1st (highest)
+  $('#stage').innerHTML = [0, 1, 2, 3].map(i => {
     const t = p[i], first = i === 3, cls = (i >= newFrom && i <= lastAdded) ? '' : 'style="animation:none"';
     const card = t === undefined ? '' : `<div class="pcard ${first ? 'first' : ''}" ${cls}>${first ? '<span class="crown">👑</span>' : ''}${esc(S.names[t])}<span class="pts">${total(t)} pts</span></div>`;
     const tw = first && t !== undefined ? `<b class="tchamp" ${cls}>CHAMPION!</b>` : ''; // CHAMPION! is written on the brick tower itself
