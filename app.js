@@ -22,7 +22,11 @@ let P = freshP(), practice = false, phase = 'preview', tm = null, timerId = null
 /* ---------- Responsive fitting ---------- */
 function setVh() { document.documentElement.style.setProperty('--vh', (window.visualViewport ? visualViewport.height : innerHeight) * 0.01 + 'px'); }
 function setBar() { document.documentElement.style.setProperty('--bar', document.body.classList.contains('ingame') ? $('#bar').offsetHeight + 'px' : '0px'); }
-function fitQ() { // preview: make the question as LARGE as possible while still fitting its box
+function fitQ() { fitQ0(); fitJa(); requestAnimationFrame(fitJa); setTimeout(fitJa, 1000); }
+function fitJa() { // the Japanese line stays on ONE line: shrink it until it fits the question box width
+  $$('.qja').forEach(e => { e.style.fontSize = ''; let fs = parseFloat(getComputedStyle(e).fontSize), n = 0; while (e.scrollWidth > e.clientWidth + 1 && fs > 4 && n++ < 80) { fs *= 0.95; e.style.fontSize = fs + 'px'; } });
+}
+function fitQ0() { // preview: make the question as LARGE as possible while still fitting its box
   const q = $('#qbox'); q.style.fontSize = '';
   if (phase !== 'preview' || !$('#game').classList.contains('active')) return;
   const vh = (window.visualViewport ? visualViewport.height : innerHeight) / 100;
@@ -33,7 +37,7 @@ function fitQ() { // preview: make the question as LARGE as possible while still
 function refit() { setVh(); setBar(); fitQ(); requestAnimationFrame(fitQ); setTimeout(fitQ, 400); }
 setVh(); window.addEventListener('resize', refit); window.addEventListener('orientationchange', () => setTimeout(refit, 250));
 if (window.visualViewport) visualViewport.addEventListener('resize', refit);
-if (window.ResizeObserver) { new ResizeObserver(() => { setBar(); }).observe($('#bar')); new ResizeObserver(() => { if (phase === 'preview') fitQ(); }).observe($('#qbox')); }
+if (window.ResizeObserver) { new ResizeObserver(() => { setBar(); }).observe($('#bar')); new ResizeObserver(() => { if (phase === 'preview') fitQ(); else fitJa(); }).observe($('#qbox')); }
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
 
 /* ---------- Helpers ---------- */
@@ -124,7 +128,7 @@ function tick() {
 function beginQuestion(i, isPractice) { // isPractice = the warm-up round: same screens, but no points and it does not touch the saved question number
   stopTimer(); stopMusic(); stopSfx(); practice = !!(isPractice && practiceQ); if (practice) P = freshP(); else { S.q = i; save(); } undoStack = []; show('game');
   const q = practice ? practiceQ : questions[i];
-  $('#qnum').textContent = practice ? 'PRACTICE QUESTION' : `QUESTION ${i + 1} / ${N}`; $('#qbox').textContent = q.question;
+  $('#qnum').textContent = practice ? 'PRACTICE QUESTION' : `QUESTION ${i + 1} / ${N}`; $('#qbox').innerHTML = `<div class="qin"><div class="qen">${esc(q.question)}</div>${q.ja ? `<div class="qja">${esc(q.ja)}</div>` : ''}</div>`;
   $$('.ans').forEach(a => { a.classList.remove('win', 'dim'); a.querySelector('.atext').textContent = q.options[a.dataset.c]; });
   $('#scorepanel').innerHTML = ''; shown = []; startPhase('preview', S.pre);
 }
